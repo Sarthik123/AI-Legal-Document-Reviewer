@@ -63,3 +63,77 @@ As a result, users spend significant time reviewing documents, incur unnecessary
 3. Increase the number of legal documents reviewed per active user.
 
 4. Increase paid subscriber conversion and retention.
+
+
+
+
+
+
+
+
+
+
+## User Personas
+
+### 1. Small Business Owner
+
+**Primary Goal**
+
+Understand contracts before signing them without relying on a lawyer for every document.
+
+**Pain Points**
+
+- Legal language is difficult to understand.
+- Reviewing contracts manually is time-consuming.
+- Hiring a lawyer for every document is expensive.
+- Unsure when a document requires professional legal review.
+- General AI tools provide generic or unreliable responses.
+
+**Current Solution**
+
+- Reviews contracts manually.
+- Uses Google or general AI tools such as ChatGPT.
+- Consults a lawyer for complex or high-risk agreements.
+
+---
+
+### 2. Startup Founder
+
+**Primary Goal**
+
+Understand legal agreements before signing them and know when professional legal advice is actually required.
+
+**Pain Points**
+
+- Hidden clauses and missing information are difficult to identify.
+- High legal costs for professional review.
+- Contract reviews delay important business decisions.
+- Long legal documents require constant cross-referencing and are difficult to understand.
+
+**Current Solution**
+
+- Reviews contracts independently for initial understanding.
+- Uses general AI tools and online resources.
+- Consults legal professionals for fundraising, IP, shareholder, or other high-risk agreements.
+
+---
+
+### 3. Individual Consumer
+
+**Primary Goal**
+
+Understand legal documents before signing them and reduce the need for paid legal advice on routine legal matters.
+
+**Pain Points**
+
+- Complex legal language is difficult to understand.
+- Professional legal advice is expensive for routine documents.
+- Important clauses and obligations are easy to overlook.
+- General AI tools provide responses that are not grounded in the uploaded document, making them difficult to trust.
+
+**Current Solution**
+
+- Reads documents independently.
+- Searches online to understand legal terms and clauses.
+- Uses general AI tools to interpret legal language.
+- Consults a lawyer for complex or high-value legal matters.
