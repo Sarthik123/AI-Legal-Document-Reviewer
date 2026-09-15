@@ -136,4 +136,4 @@ Understand legal documents before signing them and reduce the need for paid lega
 - Reads documents independently.
 - Searches online to understand legal terms and clauses.
 - Uses general AI tools to interpret legal language.
-- Consults a lawyer for complex or high-value legal matters.
+- Consults a lawyer for complex or high-value legal matters. 
