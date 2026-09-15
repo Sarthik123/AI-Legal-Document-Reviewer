@@ -13,3 +13,18 @@ Unlike enterprise-focused legal AI platforms designed for law firms and large or
 ## Product Vision
 
 To empower individuals, startups, and small businesses to confidently understand, review, and make informed decisions on legal documents through accessible, trustworthy, and affordable AI-powered legal assistance.
+
+
+
+
+
+
+
+
+
+
+## Problem Statement
+
+Individuals, startup founders, and small business owners frequently encounter legal documents such as contracts, employment agreements, NDAs, vendor agreements, and insurance policies. These documents are often written in complex legal language, making them difficult to understand without professional legal expertise.
+
+As a result, users spend significant time reviewing documents, incur unnecessary legal costs for routine matters, or make decisions without fully understanding their rights, obligations, and potential risks. Existing AI legal solutions primarily target enterprise legal teams and law firms, leaving non-expert users with limited access to affordable, trustworthy, and easy-to-use legal document review tools.
