@@ -173,3 +173,37 @@ As an Individual Consumer, I want to quickly understand the key terms and obliga
 ### 6. Small Business Owner
 
 As a Small Business Owner, I want to ask questions about specific clauses in my legal document so I can clarify details and understand them before signing.
+
+
+
+
+
+
+
+
+
+## Functional Requirements
+
+### 1. Document Upload
+
+The system shall allow users to upload supported legal documents for analysis.
+
+### 2. AI Summary
+
+The system shall generate a plain-language summary of the uploaded legal document.
+
+### 3. Document-Grounded Citations
+
+The system shall provide citations linking key document-specific statements to the relevant sections of the uploaded document.
+
+### 4. Document Q&A
+
+The system shall allow users to ask questions about the uploaded document and receive document-grounded responses.
+
+### 5. Risk Detection
+
+The system shall identify and clearly communicate potential risks found in the uploaded document.
+
+### 6. Missing Information / Omission Detection
+
+The system shall identify potentially missing or omitted information based on the document type and available context.
