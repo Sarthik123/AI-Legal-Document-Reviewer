@@ -136,4 +136,40 @@ Understand legal documents before signing them and reduce the need for paid lega
 - Reads documents independently.
 - Searches online to understand legal terms and clauses.
 - Uses general AI tools to interpret legal language.
-- Consults a lawyer for complex or high-value legal matters. 
+- Consults a lawyer for complex or high-value legal matters.
+
+
+
+
+
+
+
+
+
+
+
+## User Stories
+
+### 1. Startup Founder
+
+As a Startup Founder, when I receive a legal document, I want to understand its key clauses and potential risks so I can decide whether to sign it or request changes.
+
+### 2. Individual Consumer
+
+As an Individual Consumer, when I review legal documents, I want to understand complex legal language in simple terms so I can confidently understand my rights and obligations.
+
+### 3. Small Business Owner
+
+As a Small Business Owner, when I review a legal document, I want to verify the source of important information so I can trust the analysis before making a decision.
+
+### 4. Startup Founder
+
+As a Startup Founder, when I review a legal document, I want to identify important omissions or potential risks so I can avoid signing an unfavourable agreement.
+
+### 5. Small Business Owner
+
+As a Small Business Owner, I want to quickly understand my legal document in simple language so I can save time and make informed decisions.
+
+### 6. Small Business Owner
+
+As a Small Business Owner, I want to ask questions about my legal document so I can clarify specific clauses and fully understand it before signing.
