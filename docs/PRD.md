@@ -166,10 +166,10 @@ As a Small Business Owner, when I review a legal document, I want to verify the 
 
 As a Startup Founder, when I review a legal document, I want to identify important omissions or potential risks so I can avoid signing an unfavourable agreement.
 
-### 5. Small Business Owner
+### 5. Individual Consumer
 
-As a Small Business Owner, I want to quickly understand my legal document in simple language so I can save time and make informed decisions.
+As an Individual Consumer, I want to quickly understand the key terms and obligations in my legal document so I can save time and make informed decisions.
 
 ### 6. Small Business Owner
 
-As a Small Business Owner, I want to ask questions about my legal document so I can clarify specific clauses and fully understand it before signing.
+As a Small Business Owner, I want to ask questions about specific clauses in my legal document so I can clarify details and understand them before signing.
