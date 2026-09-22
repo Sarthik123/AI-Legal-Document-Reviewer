@@ -17,9 +17,12 @@ export default function Home() {
         </p>
 
         <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-          <button className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700">
+          <a
+            href="/upload"
+            className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700"
+          >
             Review a Document
-          </button>
+          </a>
 
           <button className="rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-700 hover:bg-gray-50">
             Learn More
