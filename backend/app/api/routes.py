@@ -22,6 +22,13 @@ async def upload_document(file: UploadFile = File(...)):
         )
 
     file_data = await file.read()
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+    if len(file_data) > MAX_FILE_SIZE:
+        raise HTTPException(
+           status_code=400,
+           detail="File size must be 10 MB or less.",
+ )
 
     if not file_data:
         raise HTTPException(
