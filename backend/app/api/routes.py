@@ -4,10 +4,13 @@ from tempfile import NamedTemporaryFile
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.api.auth import get_current_user
 from app.database import get_db
 from app.models.document import Document
+from app.models.user import User
 from app.services.document_service import extract_text_from_pdf
 from app.services.storage_service import save_document
+
 
 router = APIRouter()
 
@@ -21,6 +24,7 @@ def health_check():
 async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     if file.content_type != "application/pdf":
         raise HTTPException(
@@ -29,7 +33,7 @@ async def upload_document(
         )
 
     file_data = await file.read()
-    max_file_size = 10 * 1024 * 1024  # 10 MB
+    max_file_size = 10 * 1024 * 1024
 
     if len(file_data) > max_file_size:
         raise HTTPException(
@@ -50,6 +54,7 @@ async def upload_document(
 
     document = Document(
         id=document_id,
+        user_id=current_user.id,
         filename=file.filename or "document.pdf",
         content_type=file.content_type,
         storage_path=stored_path,

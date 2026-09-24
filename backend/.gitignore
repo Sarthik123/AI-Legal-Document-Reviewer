@@ -1,3 +1,4 @@
+.env
 storage/documents/
 __pycache__/
 .venv/
