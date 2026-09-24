@@ -1,8 +1,11 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
+from app.database import get_db
+from app.models.document import Document
 from app.services.document_service import extract_text_from_pdf
 from app.services.storage_service import save_document
 
@@ -15,7 +18,10 @@ def health_check():
 
 
 @router.post("/documents")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=400,
@@ -42,6 +48,17 @@ async def upload_document(file: UploadFile = File(...)):
         file_data,
     )
 
+    document = Document(
+        id=document_id,
+        filename=file.filename or "document.pdf",
+        content_type=file.content_type,
+        storage_path=stored_path,
+        processing_status="uploaded",
+    )
+
+    db.add(document)
+    db.commit()
+
     with NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
         temp_file.write(file_data)
         temp_path = temp_file.name
@@ -49,12 +66,16 @@ async def upload_document(file: UploadFile = File(...)):
     try:
         extracted_text = extract_text_from_pdf(temp_path)
 
+        document.text_length = len(extracted_text)
+        document.processing_status = "processed"
+        db.commit()
+
         return {
             "document_id": document_id,
             "filename": file.filename,
             "content_type": file.content_type,
             "text_length": len(extracted_text),
-            "message": "PDF uploaded, stored, and text extracted successfully.",
+            "message": "PDF uploaded, stored, and saved to database successfully.",
         }
 
     finally:
