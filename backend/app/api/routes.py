@@ -85,3 +85,94 @@ async def upload_document(
 
     finally:
         Path(temp_path).unlink(missing_ok=True)
+
+
+@router.get("/documents")
+def list_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    documents = (
+        db.query(Document)
+        .filter(Document.user_id == current_user.id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "document_id": document.id,
+            "filename": document.filename,
+            "content_type": document.content_type,
+            "processing_status": document.processing_status,
+            "text_length": document.text_length,
+            "created_at": document.created_at,
+        }
+        for document in documents
+    ]
+
+
+@router.get("/documents/{document_id}")
+def get_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    document = (
+        db.query(Document)
+        .filter(
+            Document.id == document_id,
+            Document.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    return {
+        "document_id": document.id,
+        "filename": document.filename,
+        "content_type": document.content_type,
+        "processing_status": document.processing_status,
+        "text_length": document.text_length,
+        "created_at": document.created_at,
+    }
+
+
+@router.delete("/documents/{document_id}")
+def delete_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    document = (
+        db.query(Document)
+        .filter(
+            Document.id == document_id,
+            Document.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    storage_path = Path(document.storage_path)
+
+    if storage_path.exists():
+        storage_path.unlink()
+
+    db.delete(document)
+    db.commit()
+
+    return {
+        "message": "Document deleted successfully.",
+        "document_id": document_id,
+    }
