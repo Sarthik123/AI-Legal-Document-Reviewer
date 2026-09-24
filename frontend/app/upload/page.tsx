@@ -1,4 +1,58 @@
+"use client";
+
+import { ChangeEvent, useState } from "react";
+
 export default function UploadPage() {
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [documentId, setDocumentId] = useState("");
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (file.type !== "application/pdf") {
+      setMessage("Please select a PDF document.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setUploading(true);
+    setMessage("");
+    setDocumentId("");
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/documents", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Upload failed.");
+      }
+
+      setDocumentId(data.document_id);
+      setMessage(
+        `Uploaded successfully. ${data.filename} has been saved and processed.`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong during upload.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
       <section className="mx-auto max-w-3xl px-6 py-20">
@@ -29,9 +83,28 @@ export default function UploadPage() {
             PDF documents supported
           </p>
 
-          <button className="mt-6 rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700">
-            Choose PDF
-          </button>
+          <label className="mt-6 inline-block cursor-pointer rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700">
+            {uploading ? "Uploading..." : "Choose PDF"}
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileChange}
+              className="hidden"
+              disabled={uploading}
+            />
+          </label>
+
+          {message && (
+            <p className="mt-6 text-sm text-gray-700">
+              {message}
+            </p>
+          )}
+
+          {documentId && (
+            <p className="mt-2 text-xs text-gray-500">
+              Document ID: {documentId}
+            </p>
+          )}
         </div>
 
         <p className="mt-6 text-center text-sm text-gray-500">
