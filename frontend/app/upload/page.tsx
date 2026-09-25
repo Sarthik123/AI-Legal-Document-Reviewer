@@ -64,9 +64,10 @@ export default function UploadPage() {
       }
 
       setDocumentId(data.document_id);
-      setMessage(
-        `Uploaded successfully. ${data.filename} has been saved and processed.`,
-      );
+setMessage(
+  `Uploaded successfully. ${data.filename} has been saved and processed.`,
+);
+router.push("/dashboard");
     } catch (error) {
       setMessage(
         error instanceof Error
