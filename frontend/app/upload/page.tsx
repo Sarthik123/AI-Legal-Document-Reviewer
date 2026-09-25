@@ -1,21 +1,37 @@
 "use client";
 
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
+  const router = useRouter();
+
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [documentId, setDocumentId] = useState("");
 
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      router.push("/login");
+    }
+  }, [router]);
+
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (file.type !== "application/pdf") {
       setMessage("Please select a PDF document.");
+      return;
+    }
+
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      router.push("/login");
       return;
     }
 
@@ -29,10 +45,19 @@ export default function UploadPage() {
     try {
       const response = await fetch("http://127.0.0.1:8000/documents", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 
       const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem("access_token");
+        router.push("/login");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(data.detail || "Upload failed.");
@@ -85,6 +110,7 @@ export default function UploadPage() {
 
           <label className="mt-6 inline-block cursor-pointer rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700">
             {uploading ? "Uploading..." : "Choose PDF"}
+
             <input
               type="file"
               accept="application/pdf"
