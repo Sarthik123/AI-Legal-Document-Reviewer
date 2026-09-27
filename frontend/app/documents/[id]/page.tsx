@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 
-type Document = {
+type DocumentData = {
   document_id: string;
   filename: string;
   content_type: string;
@@ -12,57 +16,179 @@ type Document = {
   created_at: string;
 };
 
+type ChatSource = {
+  source: number;
+  content: string;
+};
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  sources?: ChatSource[];
+};
+type DocumentAnalysis = {
+  summary: string;
+  key_points: string[];
+  risks: {
+    title: string;
+    severity: "high" | "medium" | "low";
+    description: string;
+    source: number;
+    evidence: string;
+  }[];
+  missing_information: {
+    item: string;
+    description: string;
+    source: number;
+    evidence: string;
+  }[];
+};
+
 export default function DocumentPage() {
-  const router = useRouter();
   const params = useParams();
+  const router = useRouter();
 
   const documentId = params.id as string;
+  useEffect(() => {
+  async function runAnalysis() {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      return;
+    }
+
+    setAnalysisLoading(true);
+    setAnalysisError("");
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/documents/${documentId}/analyze`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Failed to analyze document."
+        );
+      }
+
+      setAnalysis(data);
+    } catch (error) {
+      setAnalysisError(
+        error instanceof Error
+          ? error.message
+          : "Failed to analyze document."
+      );
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }
+
+  runAnalysis();
+}, [documentId]);
 
   const [document, setDocument] =
-    useState<Document | null>(null);
+    useState<DocumentData | null>(null);
 
+  const [pdfUrl, setPdfUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] =
+    useState<ChatMessage[]>([]);
+  const [chatSending, setChatSending] = useState(false);
+  const [analysis, setAnalysis] =
+  useState<DocumentAnalysis | null>(null);
+
+const [analysisLoading, setAnalysisLoading] =
+  useState(false);
+
+const [analysisError, setAnalysisError] =
+  useState("");
+  const [chatError, setChatError] = useState("");
+
+  const chatContainerRef =
+    useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
+    let objectUrl = "";
+
     async function loadDocument() {
       const token = localStorage.getItem("access_token");
 
       if (!token) {
-        router.push("/login");
+        router.replace("/login");
         return;
       }
 
       try {
-        const response = await fetch(
+        const documentResponse = await fetch(
           `http://127.0.0.1:8000/documents/${documentId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          },
+          }
         );
 
-        if (response.status === 401) {
+        const documentData =
+          await documentResponse.json();
+
+        if (documentResponse.status === 401) {
           localStorage.removeItem("access_token");
-          router.push("/login");
+          router.replace("/login");
           return;
         }
 
-        const data = await response.json();
-
-        if (!response.ok) {
+        if (!documentResponse.ok) {
           throw new Error(
-            data.detail || "Could not load document.",
+            documentData.detail ||
+              "Failed to load document."
           );
         }
 
-        setDocument(data);
-      } catch (error) {
+        setDocument(documentData);
+
+        const pdfResponse = await fetch(
+          `http://127.0.0.1:8000/documents/${documentId}/file`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!pdfResponse.ok) {
+          const pdfError =
+            await pdfResponse.json();
+
+          throw new Error(
+            pdfError.detail ||
+              "Failed to load PDF."
+          );
+        }
+
+        const pdfBlob = await pdfResponse.blob();
+
+        objectUrl =
+          URL.createObjectURL(pdfBlob);
+
+        setPdfUrl(objectUrl);
+        setLoading(false);
+      } 
+      catch (error) {
         setMessage(
           error instanceof Error
             ? error.message
-            : "Could not load document.",
+            : "Failed to load document."
         );
       } finally {
         setLoading(false);
@@ -70,60 +196,208 @@ export default function DocumentPage() {
     }
 
     loadDocument();
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
   }, [documentId, router]);
+
+  useEffect(() => {
+    const container =
+      chatContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    container.scrollTop =
+      container.scrollHeight;
+  }, [chatMessages, chatSending]);
+
+  async function handleChatSubmit(
+    event: { preventDefault: () => void }
+  ) {
+    event.preventDefault();
+
+    const trimmedMessage =
+      chatInput.trim();
+
+    if (
+      !trimmedMessage ||
+      chatSending
+    ) {
+      return;
+    }
+
+    const token =
+      localStorage.getItem(
+        "access_token"
+      );
+
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    const previousHistory =
+      chatMessages.map((item) => ({
+        role: item.role,
+        content: item.content,
+      }));
+
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: trimmedMessage,
+    };
+
+    setChatMessages((previous) => [
+      ...previous,
+      userMessage,
+    ]);
+
+    setChatInput("");
+    setChatError("");
+    setChatSending(true);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/documents/${documentId}/chat`,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            message: trimmedMessage,
+            history: previousHistory,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem(
+          "access_token"
+        );
+        router.replace("/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            "Failed to get a response."
+        );
+      }
+
+      const assistantMessage:
+        ChatMessage = {
+        role: "assistant",
+        content: data.answer,
+        sources: data.sources || [],
+      };
+
+      setChatMessages((previous) => [
+        ...previous,
+        assistantMessage,
+      ]);
+    } catch (error) {
+      setChatError(
+        error instanceof Error
+          ? error.message
+          : "Failed to get a response."
+      );
+    } finally {
+      setChatSending(false);
+    }
+  }
+
+  function clearChat() {
+    setChatMessages([]);
+    setChatInput("");
+    setChatError("");
+  }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 p-10 text-center">
-        Loading document...
+      <main className="min-h-screen bg-white px-6 py-16 text-gray-900">
+        <div className="mx-auto max-w-6xl">
+          <p>Loading document...</p>
+        </div>
       </main>
     );
   }
 
-  if (!document) {
+  if (message || !document) {
     return (
-      <main className="min-h-screen bg-gray-50 px-6 py-12">
-        <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-bold">
-            Document unavailable
-          </h1>
-
-          <p className="mt-3 text-red-600">
-            {message}
+      <main className="min-h-screen bg-white px-6 py-16 text-gray-900">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-red-600">
+            {message ||
+              "Document not found."}
           </p>
-
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="mt-6 rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white"
-          >
-            Back to dashboard
-          </button>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900">
-      <section className="mx-auto max-w-4xl px-6 py-12">
+    <main className="min-h-screen bg-gray-50 px-6 py-8 text-gray-900">
+      <div className="mx-auto max-w-7xl">
         <button
-          onClick={() => router.push("/dashboard")}
-          className="text-sm font-medium text-blue-600 hover:text-blue-700"
+          type="button"
+          onClick={() =>
+            router.push("/dashboard")
+          }
+          className="mb-6 text-sm text-gray-600 hover:text-black"
         >
-          ← Back to dashboard
+          ← Back to Dashboard
         </button>
 
-        <div className="mt-8 rounded-2xl bg-white p-8 shadow-sm">
-          <p className="text-sm font-semibold text-blue-600">
-            Document
-          </p>
+        <h1 className="text-3xl font-bold">
+          {document.filename}
+        </h1>
 
-          <h1 className="mt-2 text-3xl font-bold">
-            {document.filename}
-          </h1>
+        <p className="mt-2 text-gray-600">
+          Document Review
+        </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg bg-gray-50 p-4">
+        <div className="mt-8 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="border-b border-gray-200 px-5 py-3">
+            <h2 className="font-semibold">
+              PDF Document
+            </h2>
+          </div>
+
+          {pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              title={document.filename}
+              className="h-[800px] w-full"
+            />
+          ) : (
+            <div className="p-6">
+              <p>
+                Unable to display the PDF.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
+          <h2 className="text-xl font-semibold">
+            Document Information
+          </h2>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
               <p className="text-sm text-gray-500">
                 Status
               </p>
@@ -133,20 +407,9 @@ export default function DocumentPage() {
               </p>
             </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
+            <div>
               <p className="text-sm text-gray-500">
-                Text extracted
-              </p>
-
-              <p className="mt-1 font-medium">
-                {document.text_length?.toLocaleString() ?? 0}{" "}
-                characters
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">
-                File type
+                File Type
               </p>
 
               <p className="mt-1 font-medium">
@@ -154,34 +417,324 @@ export default function DocumentPage() {
               </p>
             </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
+            <div>
+              <p className="text-sm text-gray-500">
+                Text Extracted
+              </p>
+
+              <p className="mt-1 font-medium">
+                {document.text_length ?? 0} characters
+              </p>
+            </div>
+
+            <div>
               <p className="text-sm text-gray-500">
                 Uploaded
               </p>
 
               <p className="mt-1 font-medium">
                 {new Date(
-                  document.created_at,
+                  document.created_at
                 ).toLocaleString()}
               </p>
             </div>
           </div>
+        </div>
+<div className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
+  <h2 className="text-xl font-semibold">
+    AI Analysis
+  </h2>
 
-          <div className="mt-10 rounded-xl border border-blue-100 bg-blue-50 p-6">
-            <h2 className="font-semibold">
-              AI review coming next
-            </h2>
+  {analysisLoading && (
+    <p className="mt-4 text-sm text-gray-500">
+      Analyzing document...
+    </p>
+  )}
 
-            <p className="mt-2 text-sm text-gray-600">
-              The document has been uploaded and processed.
-              The next implementation step will extract,
-              chunk, embed, and retrieve document content so
-              the AI can generate summaries, risks, citations,
-              and grounded answers.
-            </p>
+  {analysisError && !analysisLoading && (
+    <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+      <p className="text-sm text-red-700">
+        {analysisError}
+      </p>
+    </div>
+  )}
+
+  {analysis && !analysisLoading && (
+    <div className="mt-5 space-y-6">
+      <div>
+        <h3 className="font-semibold">
+          Summary
+        </h3>
+
+        <p className="mt-2 text-sm leading-6 text-gray-700">
+          {analysis.summary}
+        </p>
+      </div>
+
+      {analysis.key_points.length > 0 && (
+        <div>
+          <h3 className="font-semibold">
+            Key Points
+          </h3>
+
+          <div className="mt-2 space-y-2">
+            {analysis.key_points.map(
+              (point, index) => (
+                <div
+                  key={index}
+                  className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700"
+                >
+                  {point}
+                </div>
+              )
+            )}
           </div>
         </div>
-      </section>
+      )}
+
+      <div>
+        <h3 className="font-semibold">
+          Potential Risks
+        </h3>
+
+        {analysis.risks.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-500">
+            No potential risks were identified.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {analysis.risks.map(
+              (risk, index) => (
+                <details
+                  key={index}
+                  className="rounded-lg border border-gray-200 p-4"
+                >
+                  <summary className="cursor-pointer font-medium">
+                    {risk.title} — {risk.severity}
+                  </summary>
+
+                  <p className="mt-3 text-sm text-gray-700">
+                    {risk.description}
+                  </p>
+
+                  {risk.evidence && (
+                    <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                      <p className="text-xs font-semibold text-gray-500">
+                        Evidence
+                      </p>
+
+                      <p className="mt-1 text-sm text-gray-700">
+                        "{risk.evidence}"
+                      </p>
+                    </div>
+                  )}
+                </details>
+              )
+            )}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h3 className="font-semibold">
+          Missing Information
+        </h3>
+
+        {analysis.missing_information.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-500">
+            No obvious missing information was identified.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {analysis.missing_information.map(
+              (item, index) => (
+                <details
+                  key={index}
+                  className="rounded-lg border border-gray-200 p-4"
+                >
+                  <summary className="cursor-pointer font-medium">
+                    {item.item}
+                  </summary>
+
+                  <p className="mt-3 text-sm text-gray-700">
+                    {item.description}
+                  </p>
+
+                  {item.evidence && (
+                    <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                      <p className="text-xs font-semibold text-gray-500">
+                        Evidence
+                      </p>
+
+                      <p className="mt-1 text-sm text-gray-700">
+                        "{item.evidence}"
+                      </p>
+                    </div>
+                  )}
+                </details>
+              )
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+</div>
+        <div className="mt-8 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+            <div>
+              <h2 className="text-xl font-semibold">
+                Document Chat
+              </h2>
+
+              <p className="mt-1 text-sm text-gray-600">
+                Ask questions and continue the conversation about this document.
+              </p>
+            </div>
+
+            {chatMessages.length > 0 && (
+              <button
+                type="button"
+                onClick={clearChat}
+                disabled={chatSending}
+                className="text-sm text-gray-500 hover:text-black disabled:opacity-50"
+              >
+                Clear chat
+              </button>
+            )}
+          </div>
+
+          <div
+            ref={chatContainerRef}
+            className="max-h-[520px] min-h-[260px] space-y-4 overflow-y-auto p-5"
+          >
+            {chatMessages.length === 0 && (
+              <div className="flex min-h-[220px] items-center justify-center">
+                <p className="text-sm text-gray-500">
+                  Ask your first question about this document.
+                </p>
+              </div>
+            )}
+
+            {chatMessages.map(
+              (chatMessage, index) => (
+                <div
+                  key={`${chatMessage.role}-${index}`}
+                  className={
+                    chatMessage.role === "user"
+                      ? "flex justify-end"
+                      : "flex justify-start"
+                  }
+                >
+                  <div
+                    className={
+                      chatMessage.role === "user"
+                        ? "max-w-[80%] rounded-2xl bg-black px-4 py-3 text-sm text-white"
+                        : "max-w-[85%] rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800"
+                    }
+                  >
+                    <p className="whitespace-pre-wrap">
+                      {chatMessage.content}
+                    </p>
+
+                    {chatMessage.role ===
+                      "assistant" &&
+                      chatMessage.sources &&
+                      chatMessage.sources.length >
+                        0 && (
+                        <details className="mt-4 border-t border-gray-200 pt-3">
+                          <summary className="cursor-pointer text-xs font-semibold text-gray-600">
+                            Sources (
+                            {
+                              chatMessage.sources
+                                .length
+                            }
+                            )
+                          </summary>
+
+                          <div className="mt-3 space-y-2">
+                            {chatMessage.sources.map(
+                              (source) => (
+                                <div
+                                  key={
+                                    source.source
+                                  }
+                                  className="rounded-lg border border-gray-200 bg-white p-3"
+                                >
+                                  <p className="text-xs font-semibold text-gray-700">
+                                    Source{" "}
+                                    {
+                                      source.source
+                                    }
+                                  </p>
+
+                                  <p className="mt-1 text-xs leading-5 text-gray-600">
+                                    {
+                                      source.content
+                                    }
+                                  </p>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </details>
+                      )}
+                  </div>
+                </div>
+              )
+            )}
+
+            {chatSending && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                  Thinking...
+                </div>
+              </div>
+            )}
+          </div>
+
+          {chatError && (
+            <div className="border-t border-red-200 bg-red-50 px-5 py-3">
+              <p className="text-sm text-red-700">
+                {chatError}
+              </p>
+            </div>
+          )}
+
+          <form
+            onSubmit={handleChatSubmit}
+            className="border-t border-gray-200 p-4"
+          >
+            <div className="flex gap-3">
+              <textarea
+                value={chatInput}
+                onChange={(event) =>
+                  setChatInput(
+                    event.target.value
+                  )
+                }
+                placeholder="Ask about this document..."
+                rows={2}
+                disabled={chatSending}
+                className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-black disabled:bg-gray-100"
+              />
+
+              <button
+                type="submit"
+                disabled={
+                  chatSending ||
+                  !chatInput.trim()
+                }
+                className="self-end rounded-xl bg-black px-5 py-3 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {chatSending
+                  ? "Sending..."
+                  : "Send"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
   );
 }

@@ -1,13 +1,15 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [documentId, setDocumentId] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -28,18 +30,35 @@ export default function UploadPage() {
 
     if (file.type !== "application/pdf") {
       setSelectedFile(null);
+      setSuccessMessage("");
       setMessage("Please select a PDF document.");
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
       return;
     }
 
     setSelectedFile(file);
     setMessage("");
+    setSuccessMessage("");
     setDocumentId("");
   }
 
+  function handleRemoveFile() {
+    setSelectedFile(null);
+    setDocumentId("");
+    setSuccessMessage("");
+    setMessage("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
   async function handleUpload() {
-    if (!selectedFile) {
-      setMessage("Please select a PDF document first.");
+    if (!selectedFile || documentId) {
       return;
     }
 
@@ -55,7 +74,7 @@ export default function UploadPage() {
 
     setUploading(true);
     setMessage("");
-    setDocumentId("");
+    setSuccessMessage("");
 
     try {
       const response = await fetch(
@@ -82,9 +101,7 @@ export default function UploadPage() {
       }
 
       setDocumentId(data.document_id);
-      setMessage(
-        `Uploaded successfully. ${data.filename} has been processed.`
-      );
+      setSuccessMessage("Uploaded successfully.");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -109,28 +126,45 @@ export default function UploadPage() {
 
         <div className="mt-8 rounded-xl border border-gray-200 p-6">
           <input
+            ref={fileInputRef}
             type="file"
             accept=".pdf,application/pdf"
             onChange={handleFileChange}
-            disabled={uploading}
+            disabled={uploading || Boolean(selectedFile)}
             className="block w-full"
           />
 
           {selectedFile && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-700">
+            <div className="mt-4 flex items-center gap-3">
+              <p className="min-w-0 truncate text-sm text-gray-700">
                 Selected: {selectedFile.name}
               </p>
 
               <button
                 type="button"
-                onClick={handleUpload}
+                onClick={handleRemoveFile}
                 disabled={uploading}
-                className="mt-4 rounded-lg bg-black px-5 py-2 text-white disabled:opacity-50"
+                aria-label="Remove selected file"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-gray-300 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50"
               >
-                {uploading ? "Uploading..." : "Upload Document"}
+                ×
               </button>
             </div>
+          )}
+
+          {selectedFile && (
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={uploading || Boolean(documentId)}
+              className="mt-4 rounded-lg bg-black px-5 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {uploading
+                ? "Uploading..."
+                : documentId
+                  ? "Uploaded"
+                  : "Upload Document"}
+            </button>
           )}
 
           {uploading && (
@@ -140,26 +174,31 @@ export default function UploadPage() {
           )}
 
           {message && (
-            <p className="mt-4 text-gray-700">
+            <p className="mt-4 text-red-600">
               {message}
             </p>
           )}
-
-          {documentId && (
-            <button
-              type="button"
-              onClick={() => router.push("/dashboard")}
-              className="mt-4 rounded-lg bg-black px-5 py-2 text-white"
-            >
-              Go to Dashboard
-            </button>
-          )}
         </div>
 
-        <p className="mt-8 text-sm text-gray-500">
-          This tool provides AI-assisted document analysis and is not a
-          substitute for professional legal advice.
-        </p>
+        {(successMessage || documentId) && (
+          <div className="mt-4 flex items-center justify-between gap-4">
+            {successMessage && (
+              <p className="text-sm text-gray-700">
+                {successMessage}
+              </p>
+            )}
+
+            {documentId && (
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="rounded-lg bg-black px-5 py-2 text-white"
+              >
+                Go to Dashboard
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

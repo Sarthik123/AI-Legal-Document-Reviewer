@@ -150,13 +150,7 @@ export default function DashboardPage() {
             >
               Upload document
             </button>
-
-            <button
-              onClick={handleLogout}
-              className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 font-medium hover:bg-gray-50"
-            >
-              Log out
-            </button>
+            
           </div>
         </header>
 
