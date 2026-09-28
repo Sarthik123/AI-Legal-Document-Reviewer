@@ -3,51 +3,59 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setLoading(true);
     setMessage("");
 
+    if (password !== confirmPassword) {
+      setMessage("Passwords do not match.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setMessage("Password must be at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const formData = new URLSearchParams();
-
-      formData.append("username", email);
-      formData.append("password", password);
-
       const response = await fetch(
-        "http://127.0.0.1:8000/auth/token",
+        "http://127.0.0.1:8000/auth/register",
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
           },
-          body: formData.toString(),
+          body: JSON.stringify({
+            email,
+            password,
+          }),
         },
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Login failed.");
+        throw new Error(data.detail || "Registration failed.");
       }
 
-      localStorage.setItem("access_token", data.access_token);
-
-      router.push("/upload");
+      router.push("/login");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Login failed.",
+          : "Registration failed.",
       );
     } finally {
       setLoading(false);
@@ -63,10 +71,10 @@ export default function LoginPage() {
           </p>
 
           <h1 className="mt-3 text-center text-3xl font-bold">
-            Log in
+            Create an account
           </h1>
 
-          <form onSubmit={handleLogin} className="mt-8 space-y-5">
+          <form onSubmit={handleRegister} className="mt-8 space-y-5">
             <div>
               <label className="text-sm font-medium">
                 Email
@@ -91,6 +99,22 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={8}
+                className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">
+                Confirm Password
+              </label>
+
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
                 className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
               />
             </div>
@@ -100,23 +124,23 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? "Logging in..." : "Log in"}
+              {loading ? "Creating account..." : "Create account"}
             </button>
           </form>
-
-          <button
-            type="button"
-            onClick={() => router.push("/register")}
-            className="mt-4 w-full text-center text-sm text-gray-600 hover:text-black"
-          >
-            Create an account
-          </button>
 
           {message && (
             <p className="mt-5 text-center text-sm text-red-600">
               {message}
             </p>
           )}
+
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
+            className="mt-4 w-full text-center text-sm text-gray-600 hover:text-black"
+          >
+            Already have an account? Log in
+          </button>
         </div>
       </section>
     </main>

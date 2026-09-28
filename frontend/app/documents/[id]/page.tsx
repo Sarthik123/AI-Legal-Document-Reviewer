@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 type DocumentData = {
@@ -26,6 +22,7 @@ type ChatMessage = {
   content: string;
   sources?: ChatSource[];
 };
+
 type DocumentAnalysis = {
   summary: string;
   key_points: string[];
@@ -49,74 +46,71 @@ export default function DocumentPage() {
   const router = useRouter();
 
   const documentId = params.id as string;
-  useEffect(() => {
-  async function runAnalysis() {
-    const token = localStorage.getItem("access_token");
 
-    if (!token) {
-      return;
-    }
-
-    setAnalysisLoading(true);
-    setAnalysisError("");
-
-    try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/documents/${documentId}/analyze`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "Failed to analyze document."
-        );
-      }
-
-      setAnalysis(data);
-    } catch (error) {
-      setAnalysisError(
-        error instanceof Error
-          ? error.message
-          : "Failed to analyze document."
-      );
-    } finally {
-      setAnalysisLoading(false);
-    }
-  }
-
-  runAnalysis();
-}, [documentId]);
-
-  const [document, setDocument] =
-    useState<DocumentData | null>(null);
-
+  const [document, setDocument] = useState<DocumentData | null>(null);
   const [pdfUrl, setPdfUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] =
-    useState<ChatMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatSending, setChatSending] = useState(false);
-  const [analysis, setAnalysis] =
-  useState<DocumentAnalysis | null>(null);
-
-const [analysisLoading, setAnalysisLoading] =
-  useState(false);
-
-const [analysisError, setAnalysisError] =
-  useState("");
   const [chatError, setChatError] = useState("");
+
+  const [analysis, setAnalysis] =
+    useState<DocumentAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] =
+    useState(false);
+  const [analysisError, setAnalysisError] =
+    useState("");
 
   const chatContainerRef =
     useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    async function runAnalysis() {
+      const token = localStorage.getItem("access_token");
+
+      if (!token) {
+        return;
+      }
+
+      setAnalysisLoading(true);
+      setAnalysisError("");
+
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:8000/documents/${documentId}/analyze`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.detail || "Failed to analyze document."
+          );
+        }
+
+        setAnalysis(data);
+      } catch (error) {
+        setAnalysisError(
+          error instanceof Error
+            ? error.message
+            : "Failed to analyze document."
+        );
+      } finally {
+        setAnalysisLoading(false);
+      }
+    }
+
+    runAnalysis();
+  }, [documentId]);
 
   useEffect(() => {
     let objectUrl = "";
@@ -182,9 +176,7 @@ const [analysisError, setAnalysisError] =
           URL.createObjectURL(pdfBlob);
 
         setPdfUrl(objectUrl);
-        setLoading(false);
-      } 
-      catch (error) {
+      } catch (error) {
         setMessage(
           error instanceof Error
             ? error.message
@@ -205,6 +197,53 @@ const [analysisError, setAnalysisError] =
   }, [documentId, router]);
 
   useEffect(() => {
+    async function loadChatHistory() {
+      const token = localStorage.getItem("access_token");
+
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:8000/documents/${documentId}/chat`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.status === 401) {
+          localStorage.removeItem("access_token");
+          router.replace("/login");
+          return;
+        }
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+
+        setChatMessages(
+  (data.messages || []).map(
+    (message: ChatMessage) => ({
+      role: message.role,
+      content: message.content,
+      sources: message.sources || [],
+    })
+  )
+);
+      } catch {
+        // Keep the chat usable if history loading fails.
+      }
+    }
+
+    loadChatHistory();
+  }, [documentId, router]);
+
+  useEffect(() => {
     const container =
       chatContainerRef.current;
 
@@ -217,24 +256,19 @@ const [analysisError, setAnalysisError] =
   }, [chatMessages, chatSending]);
 
   async function handleChatSubmit(
-    event: { preventDefault: () => void }
+    event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
     const trimmedMessage =
       chatInput.trim();
 
-    if (
-      !trimmedMessage ||
-      chatSending
-    ) {
+    if (!trimmedMessage || chatSending) {
       return;
     }
 
     const token =
-      localStorage.getItem(
-        "access_token"
-      );
+      localStorage.getItem("access_token");
 
     if (!token) {
       router.replace("/login");
@@ -267,10 +301,8 @@ const [analysisError, setAnalysisError] =
         {
           method: "POST",
           headers: {
-            Authorization:
-              `Bearer ${token}`,
-            "Content-Type":
-              "application/json",
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             message: trimmedMessage,
@@ -279,13 +311,10 @@ const [analysisError, setAnalysisError] =
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem(
-          "access_token"
-        );
+        localStorage.removeItem("access_token");
         router.replace("/login");
         return;
       }
@@ -297,8 +326,7 @@ const [analysisError, setAnalysisError] =
         );
       }
 
-      const assistantMessage:
-        ChatMessage = {
+      const assistantMessage: ChatMessage = {
         role: "assistant",
         content: data.answer,
         sources: data.sources || [],
@@ -319,10 +347,51 @@ const [analysisError, setAnalysisError] =
     }
   }
 
-  function clearChat() {
-    setChatMessages([]);
-    setChatInput("");
-    setChatError("");
+  async function clearChat() {
+    const token =
+      localStorage.getItem("access_token");
+
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    try {
+      setChatError("");
+
+      const response = await fetch(
+        `http://127.0.0.1:8000/documents/${documentId}/chat`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem("access_token");
+        router.replace("/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Failed to clear chat."
+        );
+      }
+
+      setChatMessages([]);
+      setChatInput("");
+    } catch (error) {
+      setChatError(
+        error instanceof Error
+          ? error.message
+          : "Failed to clear chat."
+      );
+    }
   }
 
   if (loading) {
@@ -340,8 +409,7 @@ const [analysisError, setAnalysisError] =
       <main className="min-h-screen bg-white px-6 py-16 text-gray-900">
         <div className="mx-auto max-w-6xl">
           <p className="text-red-600">
-            {message ||
-              "Document not found."}
+            {message || "Document not found."}
           </p>
         </div>
       </main>
@@ -440,146 +508,150 @@ const [analysisError, setAnalysisError] =
             </div>
           </div>
         </div>
-<div className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
-  <h2 className="text-xl font-semibold">
-    AI Analysis
-  </h2>
 
-  {analysisLoading && (
-    <p className="mt-4 text-sm text-gray-500">
-      Analyzing document...
-    </p>
-  )}
+        <div className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
+          <h2 className="text-xl font-semibold">
+            AI Analysis
+          </h2>
 
-  {analysisError && !analysisLoading && (
-    <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
-      <p className="text-sm text-red-700">
-        {analysisError}
-      </p>
-    </div>
-  )}
+          {analysisLoading && (
+            <p className="mt-4 text-sm text-gray-500">
+              Analyzing document...
+            </p>
+          )}
 
-  {analysis && !analysisLoading && (
-    <div className="mt-5 space-y-6">
-      <div>
-        <h3 className="font-semibold">
-          Summary
-        </h3>
+          {analysisError && !analysisLoading && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-700">
+                {analysisError}
+              </p>
+            </div>
+          )}
 
-        <p className="mt-2 text-sm leading-6 text-gray-700">
-          {analysis.summary}
-        </p>
-      </div>
+          {analysis && !analysisLoading && (
+            <div className="mt-5 space-y-6">
+              <div>
+                <h3 className="font-semibold">
+                  Summary
+                </h3>
 
-      {analysis.key_points.length > 0 && (
-        <div>
-          <h3 className="font-semibold">
-            Key Points
-          </h3>
+                <p className="mt-2 text-sm leading-6 text-gray-700">
+                  {analysis.summary}
+                </p>
+              </div>
 
-          <div className="mt-2 space-y-2">
-            {analysis.key_points.map(
-              (point, index) => (
-                <div
-                  key={index}
-                  className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700"
-                >
-                  {point}
+              {analysis.key_points.length > 0 && (
+                <div>
+                  <h3 className="font-semibold">
+                    Key Points
+                  </h3>
+
+                  <div className="mt-2 space-y-2">
+                    {analysis.key_points.map(
+                      (point, index) => (
+                        <div
+                          key={index}
+                          className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700"
+                        >
+                          {point}
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
-              )
-            )}
-          </div>
+              )}
+
+              <div>
+                <h3 className="font-semibold">
+                  Potential Risks
+                </h3>
+
+                {analysis.risks.length === 0 ? (
+                  <p className="mt-2 text-sm text-gray-500">
+                    No potential risks were identified.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {analysis.risks.map(
+                      (risk, index) => (
+                        <details
+                          key={index}
+                          className="rounded-lg border border-gray-200 p-4"
+                        >
+                          <summary className="cursor-pointer font-medium">
+                            {risk.title} —{" "}
+                            {risk.severity}
+                          </summary>
+
+                          <p className="mt-3 text-sm text-gray-700">
+                            {risk.description}
+                          </p>
+
+                          {risk.evidence && (
+                            <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                              <p className="text-xs font-semibold text-gray-500">
+                                Evidence
+                              </p>
+
+                              <p className="mt-1 text-sm text-gray-700">
+                                "{risk.evidence}"
+                              </p>
+                            </div>
+                          )}
+                        </details>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="font-semibold">
+                  Missing Information
+                </h3>
+
+                {analysis.missing_information.length ===
+                0 ? (
+                  <p className="mt-2 text-sm text-gray-500">
+                    No obvious missing information was identified.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {analysis.missing_information.map(
+                      (item, index) => (
+                        <details
+                          key={index}
+                          className="rounded-lg border border-gray-200 p-4"
+                        >
+                          <summary className="cursor-pointer font-medium">
+                            {item.item}
+                          </summary>
+
+                          <p className="mt-3 text-sm text-gray-700">
+                            {item.description}
+                          </p>
+
+                          {item.evidence && (
+                            <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                              <p className="text-xs font-semibold text-gray-500">
+                                Evidence
+                              </p>
+
+                              <p className="mt-1 text-sm text-gray-700">
+                                "{item.evidence}"
+                              </p>
+                            </div>
+                          )}
+                        </details>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
 
-      <div>
-        <h3 className="font-semibold">
-          Potential Risks
-        </h3>
-
-        {analysis.risks.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-500">
-            No potential risks were identified.
-          </p>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {analysis.risks.map(
-              (risk, index) => (
-                <details
-                  key={index}
-                  className="rounded-lg border border-gray-200 p-4"
-                >
-                  <summary className="cursor-pointer font-medium">
-                    {risk.title} — {risk.severity}
-                  </summary>
-
-                  <p className="mt-3 text-sm text-gray-700">
-                    {risk.description}
-                  </p>
-
-                  {risk.evidence && (
-                    <div className="mt-3 rounded-lg bg-gray-50 p-3">
-                      <p className="text-xs font-semibold text-gray-500">
-                        Evidence
-                      </p>
-
-                      <p className="mt-1 text-sm text-gray-700">
-                        "{risk.evidence}"
-                      </p>
-                    </div>
-                  )}
-                </details>
-              )
-            )}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <h3 className="font-semibold">
-          Missing Information
-        </h3>
-
-        {analysis.missing_information.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-500">
-            No obvious missing information was identified.
-          </p>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {analysis.missing_information.map(
-              (item, index) => (
-                <details
-                  key={index}
-                  className="rounded-lg border border-gray-200 p-4"
-                >
-                  <summary className="cursor-pointer font-medium">
-                    {item.item}
-                  </summary>
-
-                  <p className="mt-3 text-sm text-gray-700">
-                    {item.description}
-                  </p>
-
-                  {item.evidence && (
-                    <div className="mt-3 rounded-lg bg-gray-50 p-3">
-                      <p className="text-xs font-semibold text-gray-500">
-                        Evidence
-                      </p>
-
-                      <p className="mt-1 text-sm text-gray-700">
-                        "{item.evidence}"
-                      </p>
-                    </div>
-                  )}
-                </details>
-              )
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )}
-</div>
         <div className="mt-8 overflow-hidden rounded-xl border border-gray-200 bg-white">
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
             <div>
@@ -645,10 +717,7 @@ const [analysisError, setAnalysisError] =
                         <details className="mt-4 border-t border-gray-200 pt-3">
                           <summary className="cursor-pointer text-xs font-semibold text-gray-600">
                             Sources (
-                            {
-                              chatMessage.sources
-                                .length
-                            }
+                            {chatMessage.sources.length}
                             )
                           </summary>
 
@@ -656,22 +725,16 @@ const [analysisError, setAnalysisError] =
                             {chatMessage.sources.map(
                               (source) => (
                                 <div
-                                  key={
-                                    source.source
-                                  }
+                                  key={source.source}
                                   className="rounded-lg border border-gray-200 bg-white p-3"
                                 >
                                   <p className="text-xs font-semibold text-gray-700">
                                     Source{" "}
-                                    {
-                                      source.source
-                                    }
+                                    {source.source}
                                   </p>
 
                                   <p className="mt-1 text-xs leading-5 text-gray-600">
-                                    {
-                                      source.content
-                                    }
+                                    {source.content}
                                   </p>
                                 </div>
                               )

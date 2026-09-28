@@ -1,6 +1,9 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Literal
+from uuid import uuid4
+
+from app.models.chat import ChatMessage
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -10,17 +13,17 @@ from sqlalchemy.orm import Session
 from app.api.auth import get_current_user
 from app.database import get_db
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 from app.models.user import User
 from app.services.analysis_service import analyze_document
 from app.services.chat_service import chat_about_document
 from app.services.document_service import (
     extract_pages_from_pdf,
 )
-from app.services.ocr_service import extract_text_with_ocr
-from app.services.qa_service import (
-    generate_grounded_answer,
-    retrieve_relevant_chunks,
+from app.services.ocr_service import (
+    extract_pages_with_ocr,
 )
+
 from app.services.rag_service import process_document_chunks
 from app.services.storage_service import save_document
 
@@ -74,6 +77,12 @@ async def upload_document(
             detail="The uploaded file is empty.",
         )
 
+    if not file_data.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file is not a valid PDF.",
+        )
+
     document_id, stored_path = save_document(
         file.filename or "document.pdf",
         file_data,
@@ -110,9 +119,15 @@ async def upload_document(
         )
 
         if len(extracted_text.strip()) < 50:
-            extracted_text = extract_text_with_ocr(
-                temp_path
-            )
+         pages = extract_pages_with_ocr(
+        temp_path
+      )
+
+         extracted_text = "\n".join(
+        text
+        for _, text in pages
+        if text
+    ).strip()
 
         document.text_length = len(extracted_text)
         document.processing_status = "processing"
@@ -137,7 +152,26 @@ async def upload_document(
                 "PDF uploaded, processed, chunked, and embedded successfully."
             ),
         }
+    except Exception as error:
+        db.query(DocumentChunk).filter(
+            DocumentChunk.document_id == document_id,
+        ).delete(synchronize_session=False)
 
+        storage_path = Path(document.storage_path)
+
+        if storage_path.exists():
+            storage_path.unlink()
+
+        db.delete(document)
+        db.commit()
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Document processing failed: "
+                f"{type(error).__name__}: {error}"
+            ),
+        )
     finally:
         Path(temp_path).unlink(missing_ok=True)
 
@@ -264,74 +298,46 @@ def analyze_document_route(
         detail=f"AI analysis failed: {type(error).__name__}: {error}",
     )
 
-
-@router.post("/documents/{document_id}/ask")
-def ask_document(
+@router.get("/documents/{document_id}/chat")
+def get_chat_history(
     document_id: str,
-    request: QuestionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    question = request.question.strip()
-
-    if not question:
-        raise HTTPException(
-            status_code=400,
-            detail="Question cannot be empty.",
+    messages = (
+        db.query(ChatMessage)
+        .filter(
+            ChatMessage.document_id == document_id,
+            ChatMessage.user_id == current_user.id,
         )
+        .order_by(ChatMessage.created_at.asc())
+        .all()
+    )
 
-    try:
-        filename, chunks = retrieve_relevant_chunks(
-            db=db,
-            document_id=document_id,
-            user_id=current_user.id,
-            question=question,
-            top_k=8,
-        )
+    return {
+        "messages": [
+            {
+                "role": message.role,
+                "content": message.content,
+                "sources": message.sources_json or [],
+            }
+            for message in messages
+        ]
+    }
+@router.delete("/documents/{document_id}/chat")
+def clear_chat_history(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db.query(ChatMessage).filter(
+        ChatMessage.document_id == document_id,
+        ChatMessage.user_id == current_user.id,
+    ).delete(synchronize_session=False)
 
-        if not chunks:
-            raise HTTPException(
-                status_code=404,
-                detail="No document content is available for analysis.",
-            )
+    db.commit()
 
-        answer, supported, evidence = generate_grounded_answer(
-            question=question,
-            filename=filename,
-            chunks=chunks,
-        )
-
-        sources = []
-
-        if supported:
-            sources = [
-                {
-                    "source": index,
-                    "chunk_id": "",
-                    "chunk_index": -1,
-                    "content": item,
-                }
-                for index, item in enumerate(
-                    evidence,
-                    start=1,
-                )
-            ]
-
-        return {
-            "question": question,
-            "answer": answer,
-            "sources": sources,
-        }
-
-    except HTTPException:
-        raise
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"AI analysis failed: {str(error)}",
-        )
-
+    return {"message": "Chat cleared successfully."}
 
 @router.post("/documents/{document_id}/chat")
 def chat_document(
@@ -365,6 +371,29 @@ def chat_document(
             history=history,
         )
 
+        db.add(
+            ChatMessage(
+                id=str(uuid4()),
+                document_id=document_id,
+                user_id=current_user.id,
+                role="user",
+                content=message,
+            )
+        )
+
+        db.add(
+            ChatMessage(
+                id=str(uuid4()),
+                document_id=document_id,
+                user_id=current_user.id,
+                role="assistant",
+                content=result["answer"],
+                sources_json=result["sources"],
+            )
+        )
+
+        db.commit()
+
         sources = [
             {
                 "source": index,
@@ -379,22 +408,18 @@ def chat_document(
         return {
             "message": message,
             "answer": result["answer"],
-            "standalone_question": result[
-                "standalone_question"
-            ],
+            "standalone_question": result["standalone_question"],
             "sources": sources,
         }
 
     except HTTPException:
         raise
-
     except Exception as error:
+        db.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Chat failed: {str(error)}",
         )
-
-
 @router.delete("/documents/{document_id}")
 def delete_document(
     document_id: str,

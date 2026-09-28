@@ -17,14 +17,20 @@ def get_ocr_reader():
     return _reader
 
 
-def extract_text_with_ocr(pdf_path: str) -> str:
+def extract_pages_with_ocr(
+    pdf_path: str,
+) -> list[tuple[int, str]]:
     reader = get_ocr_reader()
 
     document = pymupdf.open(pdf_path)
+
     pages = []
 
     try:
-        for page in document:
+        for page_number, page in enumerate(
+            document,
+            start=1,
+        ):
             pixmap = page.get_pixmap(
                 matrix=pymupdf.Matrix(2, 2),
                 alpha=False,
@@ -44,10 +50,28 @@ def extract_text_with_ocr(pdf_path: str) -> str:
                 if text.strip()
             )
 
-            if page_text:
-                pages.append(page_text)
+            pages.append(
+                (
+                    page_number,
+                    page_text,
+                )
+            )
 
     finally:
         document.close()
 
-    return "\n\n".join(pages).strip()
+    return pages
+
+
+def extract_text_with_ocr(
+    pdf_path: str,
+) -> str:
+    pages = extract_pages_with_ocr(
+        pdf_path
+    )
+
+    return "\n\n".join(
+        text
+        for _, text in pages
+        if text
+    ).strip()
