@@ -1,7 +1,5 @@
 import os
 
-from sentence_transformers import SentenceTransformer
-
 EMBEDDING_MODEL = os.getenv(
     "EMBEDDING_MODEL",
     "sentence-transformers/all-MiniLM-L6-v2",
@@ -13,7 +11,16 @@ _model = None
 def get_embedding_model():
     global _model
     if _model is None:
+        from sentence_transformers import SentenceTransformer
+
         _model = SentenceTransformer(EMBEDDING_MODEL)
+        try:
+            import torch
+
+            torch.set_num_threads(1)
+            torch.set_num_interop_threads(1)
+        except (ImportError, RuntimeError):
+            pass
     return _model
 
 

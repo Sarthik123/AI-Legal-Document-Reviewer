@@ -1,3 +1,5 @@
+import gc
+
 import pymupdf
 
 
@@ -64,6 +66,12 @@ def extract_pages_with_ocr(
 
     finally:
         document.close()
+        # OCR is only needed while processing scanned pages. Release its
+        # reader before embeddings are loaded so a 512 MB instance does not
+        # retain both ML models.
+        global _reader
+        _reader = None
+        gc.collect()
 
     return pages
 
