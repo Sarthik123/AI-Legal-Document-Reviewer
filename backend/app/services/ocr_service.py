@@ -10,6 +10,9 @@ def get_ocr_reader():
     global _reader
 
     if _reader is None:
+        from app.services.embedding_service import release_embedding_model
+
+        release_embedding_model()
         import easyocr
 
         _reader = easyocr.Reader(
