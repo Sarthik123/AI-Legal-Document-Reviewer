@@ -1,4 +1,3 @@
-import easyocr
 import pymupdf
 
 
@@ -9,6 +8,8 @@ def get_ocr_reader():
     global _reader
 
     if _reader is None:
+        import easyocr
+
         _reader = easyocr.Reader(
             ["en"],
             gpu=False,
@@ -19,6 +20,7 @@ def get_ocr_reader():
 
 def extract_pages_with_ocr(
     pdf_path: str,
+    page_numbers: set[int] | None = None,
 ) -> list[tuple[int, str]]:
     reader = get_ocr_reader()
 
@@ -31,8 +33,11 @@ def extract_pages_with_ocr(
             document,
             start=1,
         ):
+            if page_numbers is not None and page_number not in page_numbers:
+                continue
+
             pixmap = page.get_pixmap(
-                matrix=pymupdf.Matrix(2, 2),
+                matrix=pymupdf.Matrix(3, 3),
                 alpha=False,
             )
 
