@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { storeAccessToken } from "../auth";
+import { API_URL } from "../api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,7 +27,7 @@ export default function LoginPage() {
       formData.append("password", password);
 
       const response = await fetch(
-        "http://127.0.0.1:8000/auth/token",
+        `${API_URL}/auth/token`,
         {
           method: "POST",
           headers: {
@@ -40,7 +43,7 @@ export default function LoginPage() {
         throw new Error(data.detail || "Login failed.");
       }
 
-      localStorage.setItem("access_token", data.access_token);
+      storeAccessToken(data.access_token);
 
       router.push("/upload");
     } catch (error) {
@@ -55,7 +58,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900">
+    <main className="auth-page login-page">
       <section className="mx-auto max-w-md px-6 py-20">
         <div className="rounded-2xl bg-white p-8 shadow-sm">
           <p className="text-center text-sm font-semibold text-blue-600">
@@ -103,6 +106,15 @@ export default function LoginPage() {
               {loading ? "Logging in..." : "Log in"}
             </button>
           </form>
+
+          <div className="mt-4 flex justify-between text-sm">
+            <Link href="/forgot-password" className="text-blue-600 hover:text-blue-800">
+              Forgot password?
+            </Link>
+            <Link href="/resend-verification" className="text-blue-600 hover:text-blue-800">
+              Resend verification
+            </Link>
+          </div>
 
           <button
             type="button"

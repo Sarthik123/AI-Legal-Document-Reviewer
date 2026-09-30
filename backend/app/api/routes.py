@@ -6,7 +6,7 @@ from uuid import uuid4
 from app.models.chat import ChatMessage
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -19,13 +19,15 @@ from app.services.analysis_service import analyze_document
 from app.services.chat_service import chat_about_document
 from app.services.document_service import (
     extract_pages_from_pdf,
+    pages_requiring_ocr,
 )
 from app.services.ocr_service import (
     extract_pages_with_ocr,
 )
 
 from app.services.rag_service import process_document_chunks
-from app.services.storage_service import save_document
+from app.services.qa_service import sanitize_citation
+from app.services.storage_service import delete_document as delete_stored_document, read_document, save_document
 
 
 router = APIRouter()
@@ -43,6 +45,34 @@ class ChatMessageRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: list[ChatMessageRequest] = []
+
+
+def serialize_chat_sources(sources: list | None) -> list[dict]:
+    if not isinstance(sources, list):
+        return []
+
+    serialized = []
+
+    for index, source in enumerate(sources, start=1):
+        if isinstance(source, dict):
+            if isinstance(source.get("source"), int) and isinstance(
+                source.get("content"), str
+            ):
+                serialized.append(
+                    {
+                        **source,
+                        "content": sanitize_citation(source["content"]),
+                    }
+                )
+        elif isinstance(source, str):
+            serialized.append(
+                {
+                    "source": index,
+                    "content": sanitize_citation(source),
+                }
+            )
+
+    return serialized
 
 
 @router.get("/health")
@@ -108,26 +138,31 @@ async def upload_document(
         temp_path = temp_file.name
 
     try:
-        pages = extract_pages_from_pdf(
-         temp_path
-        )
+        pages = extract_pages_from_pdf(temp_path)
+        ocr_page_numbers = pages_requiring_ocr(temp_path, pages)
+
+        if ocr_page_numbers:
+            ocr_pages = dict(
+                extract_pages_with_ocr(
+                    temp_path,
+                    page_numbers=ocr_page_numbers,
+                )
+            )
+            pages = [
+                (
+                    page_number,
+                    ocr_pages.get(page_number, page_text)
+                    if page_number in ocr_page_numbers
+                    else page_text,
+                )
+                for page_number, page_text in pages
+            ]
 
         extracted_text = "\n".join(
-           text
-           for _, text in pages
-           if text
-        )
-
-        if len(extracted_text.strip()) < 50:
-         pages = extract_pages_with_ocr(
-        temp_path
-      )
-
-         extracted_text = "\n".join(
-        text
-        for _, text in pages
-        if text
-    ).strip()
+            text
+            for _, text in pages
+            if text
+        ).strip()
 
         document.text_length = len(extracted_text)
         document.processing_status = "processing"
@@ -157,10 +192,7 @@ async def upload_document(
             DocumentChunk.document_id == document_id,
         ).delete(synchronize_session=False)
 
-        storage_path = Path(document.storage_path)
-
-        if storage_path.exists():
-            storage_path.unlink()
+        delete_stored_document(document.storage_path)
 
         db.delete(document)
         db.commit()
@@ -253,19 +285,12 @@ def get_document_file(
             detail="Document not found.",
         )
 
-    storage_path = Path(document.storage_path)
-
-    if not storage_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="PDF file not found.",
-        )
-
-    return FileResponse(
-        path=storage_path,
-        media_type="application/pdf",
-        filename=document.filename,
-    )
+    stored_document = read_document(document.storage_path)
+    if isinstance(stored_document, Path):
+        if not stored_document.exists():
+            raise HTTPException(status_code=404, detail="PDF file not found.")
+        return FileResponse(path=stored_document, media_type="application/pdf", filename=document.filename)
+    return StreamingResponse(stored_document, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{document.filename}"'})
 
 
 @router.post("/documents/{document_id}/analyze")
@@ -288,15 +313,12 @@ def analyze_document_route(
         )
 
     except Exception as error:
-     print(
-        f"AI ANALYSIS ERROR: {type(error).__name__}: {error}",
-        flush=True,
-    )
-
-    raise HTTPException(
-        status_code=500,
-        detail=f"AI analysis failed: {type(error).__name__}: {error}",
-    )
+        error_detail = f"AI analysis failed: {type(error).__name__}: {error}"
+        print(f"AI ANALYSIS ERROR: {error_detail}", flush=True)
+        raise HTTPException(
+            status_code=500,
+            detail=error_detail,
+        ) from error
 
 @router.get("/documents/{document_id}/chat")
 def get_chat_history(
@@ -319,7 +341,9 @@ def get_chat_history(
             {
                 "role": message.role,
                 "content": message.content,
-                "sources": message.sources_json or [],
+                "sources": serialize_chat_sources(
+                    message.sources_json
+                ),
             }
             for message in messages
         ]
@@ -371,6 +395,17 @@ def chat_document(
             history=history,
         )
 
+        sources = [
+            {
+                "source": index,
+                "content": source,
+            }
+            for index, source in enumerate(
+                result["sources"],
+                start=1,
+            )
+        ]
+
         db.add(
             ChatMessage(
                 id=str(uuid4()),
@@ -388,22 +423,11 @@ def chat_document(
                 user_id=current_user.id,
                 role="assistant",
                 content=result["answer"],
-                sources_json=result["sources"],
+                sources_json=sources,
             )
         )
 
         db.commit()
-
-        sources = [
-            {
-                "source": index,
-                "content": source,
-            }
-            for index, source in enumerate(
-                result["sources"],
-                start=1,
-            )
-        ]
 
         return {
             "message": message,
@@ -441,10 +465,7 @@ def delete_document(
             detail="Document not found.",
         )
 
-    storage_path = Path(document.storage_path)
-
-    if storage_path.exists():
-        storage_path.unlink()
+    delete_stored_document(document.storage_path)
 
     db.delete(document)
     db.commit()

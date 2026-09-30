@@ -2,6 +2,8 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearAccessToken } from "../auth";
+import { API_URL } from "../api";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -78,7 +80,7 @@ export default function UploadPage() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/documents",
+        `${API_URL}/documents`,
         {
           method: "POST",
           headers: {
@@ -91,7 +93,7 @@ export default function UploadPage() {
       const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
+        clearAccessToken();
         router.replace("/login");
         return;
       }
@@ -114,7 +116,7 @@ export default function UploadPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white px-6 py-16 text-gray-900">
+    <main className="app-page upload-page">
       <div className="mx-auto max-w-2xl">
         <h1 className="text-3xl font-bold">
           Review a Document
@@ -168,7 +170,7 @@ export default function UploadPage() {
           )}
 
           {uploading && (
-            <p className="mt-4 text-gray-600">
+            <p className="upload-progress mt-4 text-gray-600">
               Uploading and processing document...
             </p>
           )}

@@ -28,14 +28,14 @@ export default function RootLayout({ children }: LayoutProps) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-screen flex flex-col pb-12">
+      <body className="flex min-h-screen flex-col">
         <AuthNav />
 
         <div className="flex-1">
           {children}
         </div>
 
-        <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white px-6 py-2 text-center text-xs text-gray-500">
+        <footer className="app-footer">
           This tool provides AI-assisted document analysis and is not a
           substitute for professional legal advice.
         </footer>

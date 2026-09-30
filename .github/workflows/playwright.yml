@@ -1,0 +1,102 @@
+name: Application E2E
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: ai_legal_reviewer
+          POSTGRES_USER: sarthikbhan
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sarthikbhan -d ai_legal_reviewer"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m venv backend/.venv
+          backend/.venv/bin/python -m pip install --upgrade pip
+          backend/.venv/bin/python -m pip install -r backend/requirements.txt
+
+      - name: Install frontend and Playwright dependencies
+        run: |
+          npm ci
+          npm ci --prefix frontend
+          npx playwright install --with-deps chromium
+
+      - name: Run frontend and backend checks
+        run: |
+          npm --prefix frontend run lint
+          frontend/node_modules/.bin/tsc --noEmit --project frontend/tsconfig.json
+          backend/.venv/bin/python -m pip check
+          backend/.venv/bin/python -m compileall -q backend/app backend/main.py
+
+      - name: Prepare PostgreSQL schema
+        working-directory: backend
+        run: |
+          .venv/bin/python -c 'from sqlalchemy import create_engine, text; engine=create_engine("postgresql+psycopg://sarthikbhan@localhost:5432/ai_legal_reviewer"); connection=engine.connect(); connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector")); connection.commit(); connection.close()'
+          .venv/bin/python -c 'import app.models.chat, app.models.document, app.models.document_chunk, app.models.user; from app.database import Base, engine; Base.metadata.create_all(bind=engine); print("Application schema ready")'
+
+      - name: Start Ollama and load the local model
+        run: |
+          curl -fsSL https://ollama.com/install.sh -o /tmp/install-ollama.sh
+          sh /tmp/install-ollama.sh
+          ollama serve >/tmp/ollama.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
+          ollama pull qwen2.5:3b
+
+      - name: Cache the local embedding model
+        working-directory: backend
+        run: |
+          .venv/bin/python -c 'from sentence_transformers import SentenceTransformer; SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2"); print("Embedding model ready")'
+          .venv/bin/python -c 'import main; print("Backend import OK")'
+
+      - name: Run application end-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14

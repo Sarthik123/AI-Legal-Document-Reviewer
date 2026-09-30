@@ -1,0 +1,28 @@
+{
+  "name": "ai-legal-document-reviewer",
+  "version": "1.0.0",
+  "description": "Using AI to simplify reading legal documents",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sarthik123/AI-Legal-Document-Reviewer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Sarthik123/AI-Legal-Document-Reviewer/issues"
+  },
+  "homepage": "https://github.com/Sarthik123/AI-Legal-Document-Reviewer#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3"
+  }
+}

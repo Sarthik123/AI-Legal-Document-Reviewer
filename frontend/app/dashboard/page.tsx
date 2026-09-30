@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearAccessToken } from "../auth";
+import { API_URL } from "../api";
 
 type Document = {
   document_id: string;
@@ -19,7 +21,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  async function loadDocuments() {
+  useEffect(() => {
     const token = localStorage.getItem("access_token");
 
     if (!token) {
@@ -27,43 +29,48 @@ export default function DashboardPage() {
       return;
     }
 
-    try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/documents",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
+    const controller = new AbortController();
 
-      if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        router.push("/login");
-        return;
-      }
+    fetch(`${API_URL}/documents`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (response.status === 401) {
+          clearAccessToken();
+          router.push("/login");
+          return;
+        }
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.detail || "Could not load documents.");
-      }
+        if (!response.ok) {
+          throw new Error(data.detail || "Could not load documents.");
+        }
 
-      setDocuments(data);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not load documents.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+        setDocuments(data);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
 
-  useEffect(() => {
-    loadDocuments();
-  }, []);
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Could not load documents.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [router]);
 
   async function deleteDocument(
     documentId: string,
@@ -86,7 +93,7 @@ export default function DashboardPage() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/documents/${documentId}`,
+        `${API_URL}/documents/${documentId}`,
         {
           method: "DELETE",
           headers: {
@@ -96,7 +103,7 @@ export default function DashboardPage() {
       );
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
+        clearAccessToken();
         router.push("/login");
         return;
       }
@@ -124,13 +131,8 @@ export default function DashboardPage() {
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem("access_token");
-    router.push("/login");
-  }
-
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900">
+    <main className="app-page dashboard-page">
       <section className="mx-auto max-w-5xl px-6 py-12">
         <header className="flex items-center justify-between">
           <div>
@@ -161,11 +163,11 @@ export default function DashboardPage() {
         )}
 
         {loading ? (
-          <div className="mt-10 rounded-2xl bg-white p-10 text-center shadow-sm">
+          <div className="loading-surface mt-10 rounded-2xl bg-white p-10 text-center shadow-sm">
             Loading documents...
           </div>
         ) : documents.length === 0 ? (
-          <div className="mt-10 rounded-2xl bg-white p-10 text-center shadow-sm">
+          <div className="empty-state mt-10 rounded-2xl bg-white p-10 text-center shadow-sm">
             <h2 className="text-xl font-semibold">
               No documents yet
             </h2>

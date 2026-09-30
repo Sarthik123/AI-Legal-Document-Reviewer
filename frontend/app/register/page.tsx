@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { API_URL } from "../api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -10,12 +11,16 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [registrationSucceeded, setRegistrationSucceeded] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setMessage("");
+    setRegistrationSucceeded(false);
+    setVerificationRequired(false);
 
     if (password !== confirmPassword) {
       setMessage("Passwords do not match.");
@@ -31,7 +36,7 @@ export default function RegisterPage() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/auth/register",
+        `${API_URL}/auth/register`,
         {
           method: "POST",
           headers: {
@@ -50,7 +55,9 @@ export default function RegisterPage() {
         throw new Error(data.detail || "Registration failed.");
       }
 
-      router.push("/login");
+      setRegistrationSucceeded(true);
+      setVerificationRequired(data.verification_required === true);
+      setMessage(data.message || "Account created.");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -63,7 +70,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900">
+    <main className="auth-page register-page">
       <section className="mx-auto max-w-md px-6 py-20">
         <div className="rounded-2xl bg-white p-8 shadow-sm">
           <p className="text-center text-sm font-semibold text-blue-600">
@@ -129,9 +136,19 @@ export default function RegisterPage() {
           </form>
 
           {message && (
-            <p className="mt-5 text-center text-sm text-red-600">
+            <p className={`mt-5 text-center text-sm ${registrationSucceeded ? "text-green-700" : "text-red-600"}`}>
               {message}
             </p>
+          )}
+
+          {registrationSucceeded && verificationRequired && (
+            <button
+              type="button"
+              onClick={() => router.push("/resend-verification")}
+              className="mt-3 w-full text-center text-sm text-blue-600 hover:text-blue-800"
+            >
+              Didn&apos;t receive the email? Resend verification
+            </button>
           )}
 
           <button

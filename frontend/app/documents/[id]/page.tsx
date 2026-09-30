@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { clearAccessToken } from "../../auth";
+import { API_URL } from "../../api";
 
 type DocumentData = {
   document_id: string;
@@ -80,7 +82,7 @@ export default function DocumentPage() {
 
       try {
         const response = await fetch(
-          `http://127.0.0.1:8000/documents/${documentId}/analyze`,
+          `${API_URL}/documents/${documentId}/analyze`,
           {
             method: "POST",
             headers: {
@@ -125,7 +127,7 @@ export default function DocumentPage() {
 
       try {
         const documentResponse = await fetch(
-          `http://127.0.0.1:8000/documents/${documentId}`,
+        `${API_URL}/documents/${documentId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -137,7 +139,7 @@ export default function DocumentPage() {
           await documentResponse.json();
 
         if (documentResponse.status === 401) {
-          localStorage.removeItem("access_token");
+          clearAccessToken();
           router.replace("/login");
           return;
         }
@@ -152,7 +154,7 @@ export default function DocumentPage() {
         setDocument(documentData);
 
         const pdfResponse = await fetch(
-          `http://127.0.0.1:8000/documents/${documentId}/file`,
+        `${API_URL}/documents/${documentId}/file`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -206,7 +208,7 @@ export default function DocumentPage() {
 
       try {
         const response = await fetch(
-          `http://127.0.0.1:8000/documents/${documentId}/chat`,
+          `${API_URL}/documents/${documentId}/chat`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -215,7 +217,7 @@ export default function DocumentPage() {
         );
 
         if (response.status === 401) {
-          localStorage.removeItem("access_token");
+          clearAccessToken();
           router.replace("/login");
           return;
         }
@@ -297,7 +299,7 @@ export default function DocumentPage() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/documents/${documentId}/chat`,
+        `${API_URL}/documents/${documentId}/chat`,
         {
           method: "POST",
           headers: {
@@ -314,7 +316,7 @@ export default function DocumentPage() {
       const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
+        clearAccessToken();
         router.replace("/login");
         return;
       }
@@ -360,7 +362,7 @@ export default function DocumentPage() {
       setChatError("");
 
       const response = await fetch(
-        `http://127.0.0.1:8000/documents/${documentId}/chat`,
+        `${API_URL}/documents/${documentId}/chat`,
         {
           method: "DELETE",
           headers: {
@@ -372,7 +374,7 @@ export default function DocumentPage() {
       const data = await response.json();
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
+        clearAccessToken();
         router.replace("/login");
         return;
       }
@@ -396,9 +398,9 @@ export default function DocumentPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-white px-6 py-16 text-gray-900">
+      <main className="app-page document-page">
         <div className="mx-auto max-w-6xl">
-          <p>Loading document...</p>
+          <p className="document-loading">Loading document...</p>
         </div>
       </main>
     );
@@ -406,9 +408,9 @@ export default function DocumentPage() {
 
   if (message || !document) {
     return (
-      <main className="min-h-screen bg-white px-6 py-16 text-gray-900">
+      <main className="app-page document-page">
         <div className="mx-auto max-w-6xl">
-          <p className="text-red-600">
+          <p className="document-load-error text-red-600">
             {message || "Document not found."}
           </p>
         </div>
@@ -417,7 +419,7 @@ export default function DocumentPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 px-6 py-8 text-gray-900">
+    <main className="app-page document-page">
       <div className="mx-auto max-w-7xl">
         <button
           type="button"
@@ -515,13 +517,13 @@ export default function DocumentPage() {
           </h2>
 
           {analysisLoading && (
-            <p className="mt-4 text-sm text-gray-500">
+            <p className="analysis-skeleton mt-4 text-sm text-gray-500">
               Analyzing document...
             </p>
           )}
 
           {analysisError && !analysisLoading && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+            <div className="analysis-error mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
               <p className="text-sm text-red-700">
                 {analysisError}
               </p>
@@ -594,7 +596,7 @@ export default function DocumentPage() {
                               </p>
 
                               <p className="mt-1 text-sm text-gray-700">
-                                "{risk.evidence}"
+                                &quot;{risk.evidence}&quot;
                               </p>
                             </div>
                           )}
@@ -638,7 +640,7 @@ export default function DocumentPage() {
                               </p>
 
                               <p className="mt-1 text-sm text-gray-700">
-                                "{item.evidence}"
+                                &quot;{item.evidence}&quot;
                               </p>
                             </div>
                           )}
@@ -653,7 +655,7 @@ export default function DocumentPage() {
         </div>
 
         <div className="mt-8 overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div className="chat-header flex items-center justify-between border-b border-gray-200 px-5 py-4">
             <div>
               <h2 className="text-xl font-semibold">
                 Document Chat
@@ -669,7 +671,7 @@ export default function DocumentPage() {
                 type="button"
                 onClick={clearChat}
                 disabled={chatSending}
-                className="text-sm text-gray-500 hover:text-black disabled:opacity-50"
+                className="chat-clear-button text-sm text-gray-500 hover:text-black disabled:opacity-50"
               >
                 Clear chat
               </button>
@@ -681,7 +683,7 @@ export default function DocumentPage() {
             className="max-h-[520px] min-h-[260px] space-y-4 overflow-y-auto p-5"
           >
             {chatMessages.length === 0 && (
-              <div className="flex min-h-[220px] items-center justify-center">
+              <div className="chat-empty-state flex min-h-[220px] items-center justify-center">
                 <p className="text-sm text-gray-500">
                   Ask your first question about this document.
                 </p>
@@ -701,8 +703,8 @@ export default function DocumentPage() {
                   <div
                     className={
                       chatMessage.role === "user"
-                        ? "max-w-[80%] rounded-2xl bg-black px-4 py-3 text-sm text-white"
-                        : "max-w-[85%] rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800"
+                        ? "chat-bubble-user max-w-[80%] rounded-2xl bg-black px-4 py-3 text-sm text-white"
+                        : "chat-bubble-assistant max-w-[85%] rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800"
                     }
                   >
                     <p className="whitespace-pre-wrap">
@@ -749,7 +751,7 @@ export default function DocumentPage() {
 
             {chatSending && (
               <div className="flex justify-start">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                <div className="chat-thinking rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
                   Thinking...
                 </div>
               </div>
@@ -757,7 +759,7 @@ export default function DocumentPage() {
           </div>
 
           {chatError && (
-            <div className="border-t border-red-200 bg-red-50 px-5 py-3">
+            <div className="chat-error border-t border-red-200 bg-red-50 px-5 py-3">
               <p className="text-sm text-red-700">
                 {chatError}
               </p>
@@ -766,7 +768,7 @@ export default function DocumentPage() {
 
           <form
             onSubmit={handleChatSubmit}
-            className="border-t border-gray-200 p-4"
+            className="chat-controls border-t border-gray-200 p-4"
           >
             <div className="flex gap-3">
               <textarea

@@ -1,6 +1,6 @@
 import json
+import os
 import re
-import urllib.request
 
 from sqlalchemy.orm import Session
 
@@ -10,9 +10,8 @@ from app.services.qa_service import (
     get_document_filename,
     retrieve_relevant_chunks,
 )
+from app.services.ai_provider import call_model
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-OLLAMA_MODEL = "qwen2.5:3b"
 
 ABSTENTION_MESSAGE = (
     "The document does not provide enough information to answer this question."
@@ -20,39 +19,7 @@ ABSTENTION_MESSAGE = (
 
 
 def call_ollama(prompt: str) -> str:
-    payload = {
-        "model": OLLAMA_MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-        "stream": False,
-        "format": "json",
-        "options": {
-            "temperature": 0,
-        },
-    }
-
-    request = urllib.request.Request(
-        OLLAMA_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
-    with urllib.request.urlopen(
-        request,
-        timeout=180,
-    ) as response:
-        result = json.loads(
-            response.read().decode("utf-8")
-        )
-
-    return result["message"]["content"].strip()
+    return call_model([{"role": "user", "content": prompt}], 128)
 
 
 def parse_json_response(response: str) -> dict | None:
@@ -332,6 +299,28 @@ def rewrite_follow_up(
     if not history:
         return message.strip()
 
+    normalized_message = normalize_text(message)
+    follow_up_starters = (
+        "i mean",
+        "more specifically",
+        "specifically",
+        "what about",
+        "how about",
+        "and what",
+        "and how",
+        "what if",
+        "does that",
+        "is that",
+        "why is that",
+        "what does that",
+    )
+
+    if not any(
+        normalized_message.startswith(starter)
+        for starter in follow_up_starters
+    ) and len(meaningful_words(message)) > 2:
+        return message.strip()
+
     history_text = "\n".join(
         f"{item['role']}: {item['content']}"
         for item in history[-8:]
@@ -366,8 +355,11 @@ Return ONLY JSON:
 }}
 """
 
-    response = call_ollama(prompt)
-    result = parse_json_response(response)
+    try:
+        response = call_ollama(prompt)
+        result = parse_json_response(response)
+    except Exception:
+        return message.strip()
 
     if not result:
         return message.strip()

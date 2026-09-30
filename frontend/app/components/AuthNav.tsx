@@ -1,44 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import {
+  clearAccessToken,
+  getLoggedInSnapshot,
+  getServerSnapshot,
+  subscribeToAuthState,
+} from "../auth";
 
 export default function AuthNav() {
   const router = useRouter();
-  const pathname = usePathname();
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    setLoggedIn(Boolean(localStorage.getItem("access_token")));
-  }, [pathname]);
+  const loggedIn = useSyncExternalStore(
+    subscribeToAuthState,
+    getLoggedInSnapshot,
+    getServerSnapshot,
+  );
 
   if (!loggedIn) {
     return null;
   }
 
   function handleLogout() {
-    localStorage.removeItem("access_token");
-    setLoggedIn(false);
+    clearAccessToken();
     router.push("/login");
   }
 
   return (
-    <div className="flex items-center justify-end gap-3 px-6 py-4">
-      <Link
-        href="/dashboard"
-        className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-      >
-        Dashboard
-      </Link>
+    <header className="app-nav">
+      <div className="app-brand" aria-label="AI Legal Document Reviewer">
+        <span className="app-brand-mark" aria-hidden="true">L</span>
+        <span>AI Legal Reviewer</span>
+      </div>
 
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-      >
-        Logout
-      </button>
-    </div>
+      <nav className="app-nav-actions" aria-label="Account navigation">
+        <Link href="/dashboard">Dashboard</Link>
+        <button type="button" onClick={handleLogout}>Logout</button>
+      </nav>
+    </header>
   );
 }

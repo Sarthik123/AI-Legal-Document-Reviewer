@@ -1,6 +1,6 @@
 export default function Home() {
   return (
-    <main className="min-h-screen bg-white text-gray-900">
+    <main className="landing-page text-gray-900">
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-6 text-center">
         <div className="mb-6 rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
           AI Legal Document Reviewer
