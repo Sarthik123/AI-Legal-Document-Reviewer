@@ -9,6 +9,14 @@ DATABASE_URL = os.getenv(
     "postgresql+psycopg://sarthikbhan@localhost:5432/ai_legal_reviewer",
 )
 
+# Neon and many hosted PostgreSQL providers expose a generic `postgresql://`
+# URL. SQLAlchemy otherwise selects the unavailable psycopg2 driver for that
+# scheme, while this project intentionally installs psycopg (v3).
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL.removeprefix("postgres://")
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL.removeprefix("postgresql://")
+
 engine = create_engine(
     DATABASE_URL,
     pool_size=int(os.getenv("DB_POOL_SIZE", "1")),
