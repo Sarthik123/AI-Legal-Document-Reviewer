@@ -379,13 +379,8 @@ test('upload screen rejects non-PDF and files larger than 10 MB', async ({ page,
     mimeType: 'application/pdf',
     buffer: oversizedPdf,
   });
-  const responsePromise = page.waitForResponse((response) =>
-    response.url() === API_URL + '/documents' && response.request().method() === 'POST',
-  );
-  await page.getByRole('button', { name: 'Upload Document' }).click();
-  const response = await responsePromise;
-  expect(response.status()).toBe(400);
-  await expect(page.getByText('File size must be 10 MB or less.')).toBeVisible();
+  await expect(page.getByText('PDF files must be 10 MB or smaller.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upload Document' })).toHaveCount(0);
 });
 
 test('scanned PDF text is extracted by OCR and remains available to document Q&A', async ({ page, request }, testInfo) => {

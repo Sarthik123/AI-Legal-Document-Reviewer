@@ -61,6 +61,48 @@ class CloudflareOCRTests(unittest.TestCase):
             extract_pages_with_ocr(str(self.scanned_pdf))
         urlopen.assert_not_called()
 
+    @patch.dict(os.environ, {
+        "AI_PROVIDER": "cloudflare_workers_ai",
+        "CLOUDFLARE_ACCOUNT_ID": "test-account",
+        "CLOUDFLARE_API_TOKEN": "test-token",
+    })
+    @patch("app.services.ocr_service.urllib.request.urlopen")
+    def test_nested_cloudflare_response_is_accepted(self, urlopen):
+        response = MagicMock()
+        response.__enter__.return_value = BytesIO(json.dumps({
+            "success": True,
+            "result": {"response": {"answer": "Nested OCR text."}},
+        }).encode("utf-8"))
+        urlopen.return_value = response
+
+        pages = extract_pages_with_ocr(str(self.scanned_pdf))
+
+        self.assertEqual(pages, [(1, "Nested OCR text.")])
+
+    @patch.dict(os.environ, {
+        "AI_PROVIDER": "cloudflare_workers_ai",
+        "CLOUDFLARE_ACCOUNT_ID": "test-account",
+        "CLOUDFLARE_API_TOKEN": "test-token",
+    })
+    @patch("app.services.ocr_service.urllib.request.urlopen")
+    def test_cloudflare_ocr_retries_an_empty_response(self, urlopen):
+        empty_response = MagicMock()
+        empty_response.__enter__.return_value = BytesIO(json.dumps({
+            "success": True,
+            "result": {"answer": None},
+        }).encode("utf-8"))
+        complete_response = MagicMock()
+        complete_response.__enter__.return_value = BytesIO(json.dumps({
+            "success": True,
+            "result": {"answer": "Recovered OCR text."},
+        }).encode("utf-8"))
+        urlopen.side_effect = [empty_response, complete_response]
+
+        pages = extract_pages_with_ocr(str(self.scanned_pdf))
+
+        self.assertEqual(pages, [(1, "Recovered OCR text.")])
+        self.assertEqual(urlopen.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

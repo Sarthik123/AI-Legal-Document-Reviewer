@@ -188,6 +188,10 @@ def upload_document(
             ),
         }
     except Exception as error:
+        print(
+            f"DOCUMENT PROCESSING ERROR: {type(error).__name__}: {error}",
+            flush=True,
+        )
         db.query(DocumentChunk).filter(
             DocumentChunk.document_id == document_id,
         ).delete(synchronize_session=False)
@@ -197,12 +201,16 @@ def upload_document(
         db.delete(document)
         db.commit()
 
+        if "OCR" in str(error):
+            user_message = (
+                "The OCR service could not read this scanned PDF. Please try again."
+            )
+        else:
+            user_message = "Document processing could not be completed. Please try again."
+
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Document processing failed: "
-                f"{type(error).__name__}: {error}"
-            ),
+            detail=user_message,
         )
     finally:
         Path(temp_path).unlink(missing_ok=True)

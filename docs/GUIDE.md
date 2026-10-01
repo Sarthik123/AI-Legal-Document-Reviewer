@@ -104,6 +104,80 @@ SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
 SELECT extname FROM pg_extension WHERE extname = 'vector';
 ```
 
+### Basic database queries
+
+Run these in Neon SQL Editor. They are safe read-only queries unless marked
+otherwise. Never display password hashes or email/reset token hashes.
+
+```sql
+-- List users.
+SELECT id, email, email_verified, created_at
+FROM users
+ORDER BY created_at DESC;
+
+-- Find one user by email.
+SELECT id, email, email_verified, created_at
+FROM users
+WHERE email = 'user@example.com';
+
+-- Count users and documents.
+SELECT COUNT(*) AS user_count FROM users;
+SELECT COUNT(*) AS document_count FROM documents;
+
+-- List documents with their owner.
+SELECT d.id, d.filename, d.processing_status, d.text_length, d.created_at,
+       u.email AS owner_email
+FROM documents d
+JOIN users u ON u.id = d.user_id
+ORDER BY d.created_at DESC;
+
+-- Find documents which did not finish processing.
+SELECT id, filename, processing_status, created_at
+FROM documents
+WHERE processing_status <> 'processed'
+ORDER BY created_at DESC;
+
+-- Inspect chunk and chat counts for one document.
+SELECT COUNT(*) AS chunk_count
+FROM document_chunks
+WHERE document_id = 'DOCUMENT_ID';
+
+SELECT role, content, created_at
+FROM chat_messages
+WHERE document_id = 'DOCUMENT_ID'
+ORDER BY created_at;
+
+-- Mark a confirmed account as verified.
+UPDATE users
+SET email_verified = TRUE
+WHERE email = 'user@example.com';
+
+-- Delete a test account only after deleting its documents through the app.
+-- That removes the private R2 files as well. Check the email carefully before
+-- running this irreversible command.
+DELETE FROM users
+WHERE email = 'test@example.com';
+```
+
+Create user accounts only through the website or the `/auth/register` API.
+The application hashes passwords and creates verification tokens; a direct
+`INSERT` into `users` would create an unusable, unsafe account.
+
+### MVP document limits and user-facing errors
+
+| Item | MVP limit or behavior |
+|---|---|
+| File type | PDF only |
+| File size | 10 MB maximum |
+| Page count | No fixed application limit |
+| Extracted characters | No fixed application limit |
+| Analysis input | Representative excerpts up to about 14,000 characters; all extracted text remains available to RAG search and chat |
+| Password | At least 8 characters |
+
+The upload screen rejects non-PDF files and files larger than 10 MB before
+uploading. The API repeats these checks. A processing or OCR failure is shown
+as a retryable processing message, while diagnostics remain in Render logs.
+
 ## Deploying a code change
 
 1. Make a small change in VS Code.

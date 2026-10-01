@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { clearAccessToken } from "../auth";
 import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
 export default function UploadPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -34,6 +36,18 @@ export default function UploadPage() {
       setSelectedFile(null);
       setSuccessMessage("");
       setMessage("Please select a PDF document.");
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setSelectedFile(null);
+      setSuccessMessage("");
+      setMessage("PDF files must be 10 MB or smaller.");
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -182,6 +196,10 @@ export default function UploadPage() {
               {message}
             </p>
           )}
+
+          <p className="mt-4 text-sm text-gray-500">
+            PDF only · Maximum file size: 10 MB · No fixed page or character limit
+          </p>
         </div>
 
         {(successMessage || documentId) && (
