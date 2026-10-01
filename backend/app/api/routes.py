@@ -164,6 +164,11 @@ def upload_document(
             if text
         ).strip()
 
+        if not extracted_text:
+            raise ValueError(
+                "No readable text could be extracted from this PDF."
+            )
+
         document.text_length = len(extracted_text)
         document.processing_status = "processing"
         db.commit()
@@ -201,9 +206,15 @@ def upload_document(
         db.delete(document)
         db.commit()
 
-        if "OCR" in str(error):
+        error_text = str(error)
+        if "No readable text" in error_text:
             user_message = (
-                "The OCR service could not read this scanned PDF. Please try again."
+                "No readable text was found in this PDF. Upload a clearer PDF "
+                "or one with selectable text."
+            )
+        elif "OCR" in error_text:
+            user_message = (
+                "The OCR service is temporarily unavailable. Please try again."
             )
         else:
             user_message = "Document processing could not be completed. Please try again."

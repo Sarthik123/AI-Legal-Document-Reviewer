@@ -187,7 +187,7 @@ export default function UploadPage() {
 
           {uploading && (
             <p className="upload-progress mt-4 text-gray-600">
-              Uploading and processing document...
+              Uploading and processing document. Scanned PDFs take longer because each scanned page is read securely before analysis.
             </p>
           )}
 

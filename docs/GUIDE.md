@@ -175,8 +175,11 @@ The application hashes passwords and creates verification tokens; a direct
 | Password | At least 8 characters |
 
 The upload screen rejects non-PDF files and files larger than 10 MB before
-uploading. The API repeats these checks. A processing or OCR failure is shown
-as a retryable processing message, while diagnostics remain in Render logs.
+uploading. The API repeats these checks. A scanned PDF takes longer because
+each scanned page is rendered and read by OCR before the document is chunked
+and embedded. OCR requests run in small parallel batches. A blank or unreadable
+page is skipped so it cannot abort the rest of a document. If every page has no
+readable text, the app explains that a clearer PDF or selectable text is needed.
 
 ## Deploying a code change
 

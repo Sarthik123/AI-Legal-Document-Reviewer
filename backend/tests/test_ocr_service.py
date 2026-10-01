@@ -48,7 +48,7 @@ class CloudflareOCRTests(unittest.TestCase):
             base64.b64decode(payload["image"].split(",", 1)[1]).startswith(b"\xff\xd8")
         )
         self.assertIn("Do not summarize", payload["question"])
-        urlopen.assert_called_once_with(request, timeout=60)
+        urlopen.assert_called_once_with(request, timeout=45)
 
     @patch.dict(os.environ, {
         "AI_PROVIDER": "cloudflare_workers_ai",
@@ -101,6 +101,28 @@ class CloudflareOCRTests(unittest.TestCase):
         pages = extract_pages_with_ocr(str(self.scanned_pdf))
 
         self.assertEqual(pages, [(1, "Recovered OCR text.")])
+        self.assertEqual(urlopen.call_count, 2)
+
+    @patch.dict(os.environ, {
+        "AI_PROVIDER": "cloudflare_workers_ai",
+        "CLOUDFLARE_ACCOUNT_ID": "test-account",
+        "CLOUDFLARE_API_TOKEN": "test-token",
+    })
+    @patch("app.services.ocr_service.urllib.request.urlopen")
+    def test_unreadable_page_does_not_abort_document_ocr(self, urlopen):
+        def empty_response():
+            response = MagicMock()
+            response.__enter__.return_value = BytesIO(json.dumps({
+                "success": True,
+                "result": {"answer": None},
+            }).encode("utf-8"))
+            return response
+
+        urlopen.side_effect = [empty_response(), empty_response()]
+
+        pages = extract_pages_with_ocr(str(self.scanned_pdf))
+
+        self.assertEqual(pages, [(1, "")])
         self.assertEqual(urlopen.call_count, 2)
 
 
