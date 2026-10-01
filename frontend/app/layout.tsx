@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import AuthNav from "./components/AuthNav";
 import "./globals.css";
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps) {
           This tool provides AI-assisted document analysis and is not a
           substitute for professional legal advice.
         </footer>
+        <Analytics />
       </body>
     </html>
   );
