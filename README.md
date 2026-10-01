@@ -30,3 +30,10 @@ npx playwright test
 
 Production architecture, security hardening, deployment sequencing, and the
 release checklist are documented in [docs/POST-MVP-PLAN.md](docs/POST-MVP-PLAN.md).
+
+## Portfolio and interview guide
+
+See [docs/GUIDE.md](docs/GUIDE.md) for a short,
+beginner-friendly explanation of the product, architecture, development
+timeline, testing, and deployment. It is safe to share publicly: secrets,
+private documents, and environment values must stay out of GitHub.

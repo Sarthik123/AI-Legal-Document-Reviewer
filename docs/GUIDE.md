@@ -161,3 +161,46 @@ Root directory is the repository root.
 - Do not disable ownership checks or upload validation.
 - Treat uploaded document text as untrusted data.
 - Review AI answers and citations against the displayed source evidence.
+
+## Simple recruiter explanation
+
+### What the product does
+
+This website lets a user upload a legal PDF, read it, ask questions, and see where each answer came from.
+
+### What I built, in order
+
+1. Built the website pages for registration, login, upload, dashboard, and document review.
+2. Built the FastAPI backend and protected each user's documents.
+3. Added PDF text extraction and OCR for scanned documents.
+4. Added RAG: the app splits documents into chunks, finds relevant chunks, and sends only that evidence to the AI.
+5. Added page-aware citations so users can check answers.
+6. Added PostgreSQL and pgvector for users, documents, chat, and embeddings.
+7. Added private Cloudflare R2 storage for uploaded files.
+8. Added Cloudflare Workers AI for production answers and Brevo for account emails.
+9. Added browser tests for the complete user journey.
+10. Deployed the frontend on Vercel and the backend on Render.
+
+### Simple architecture
+
+```text
+User → Vercel website → Render API
+                         ├─ Neon database + pgvector
+                         ├─ Cloudflare R2 files
+                         ├─ Cloudflare Workers AI
+                         └─ Brevo email
+```
+
+### Interview answer
+
+“I built an AI-assisted legal document reviewer. I started with upload and authentication, then added PDF extraction, OCR, RAG, pgvector search, grounded AI answers, and citations. I added private file storage, email verification, ownership checks, migrations, and browser E2E tests. Finally, I deployed the frontend and backend using environment variables so secrets never enter Git.”
+
+### What is safe to share
+
+Share the live website, screenshots, architecture, tests, and public source code. Never share `.env` files, API keys, passwords, database URLs, private legal documents, or customer data. Use a fake sample PDF for demonstrations.
+
+### Public links
+
+- Website: https://lawyerlens.in
+- API health: https://api.lawyerlens.in/health
+- GitHub: add the repository link here

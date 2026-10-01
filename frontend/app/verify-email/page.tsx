@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_URL } from "../api";
 
 export default function VerifyEmailPage() {
   const [message, setMessage] = useState("Verifying your email...");
+  const verificationStarted = useRef(false);
 
   useEffect(() => {
+    // React Strict Mode runs effects twice during local development. Email
+    // verification tokens are single-use, so prevent a duplicate request.
+    if (verificationStarted.current) return;
+    verificationStarted.current = true;
+
     const token = new URLSearchParams(window.location.search).get("token");
 
     Promise.resolve()
