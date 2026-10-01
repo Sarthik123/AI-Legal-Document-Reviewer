@@ -304,6 +304,23 @@ test('registration, review, grounded chat, persistence, clear, and delete', asyn
   expect(deletedDocument.status()).toBe(404);
 });
 
+test('wrong password shows an authentication error', async ({ page }) => {
+  await page.goto('/login');
+  await page.locator('input[type="email"]').fill('unknown-user@example.com');
+  await page.locator('input[type="password"]').fill('wrong-password');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByText('Incorrect email or password.')).toBeVisible();
+});
+
+test('network failures show an actionable error', async ({ page }) => {
+  await page.route('**/auth/token', (route) => route.abort('failed'));
+  await page.goto('/login');
+  await page.locator('input[type="email"]').fill('unknown-user@example.com');
+  await page.locator('input[type="password"]').fill('wrong-password');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByText('Unable to reach the server. Please try again.')).toBeVisible();
+});
+
 test('unauthenticated routes and document APIs are protected', async ({ page, request }) => {
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login$/);

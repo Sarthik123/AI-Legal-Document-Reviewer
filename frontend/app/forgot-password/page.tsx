@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 const PASSWORD_RESET_ENABLED = process.env.NEXT_PUBLIC_PASSWORD_RESET_ENABLED === "true";
 
@@ -22,15 +22,23 @@ export default function ForgotPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (!response.ok) {
-        throw new Error(data.detail || "Could not request a password reset.");
+        throw new Error(
+          typeof data.detail === "string"
+            ? data.detail
+            : "Could not request a password reset.",
+        );
       }
 
-      setMessage(data.message);
+      setMessage(
+        typeof data.message === "string"
+          ? data.message
+          : "If the account needs a reset, an email will be sent.",
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not request a password reset.");
+      setMessage(apiErrorMessage(error, "Could not request a password reset."));
     } finally {
       setLoading(false);
     }

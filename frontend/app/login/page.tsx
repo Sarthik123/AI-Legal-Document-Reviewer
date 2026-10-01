@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { storeAccessToken } from "../auth";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,10 +37,16 @@ export default function LoginPage() {
         },
       );
 
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (!response.ok) {
-        throw new Error(data.detail || "Login failed.");
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : "Login failed.",
+        );
+      }
+
+      if (typeof data.access_token !== "string" || !data.access_token) {
+        throw new Error("The server returned an invalid login response.");
       }
 
       storeAccessToken(data.access_token);
@@ -48,9 +54,7 @@ export default function LoginPage() {
       router.push("/upload");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "Login failed.",
+        apiErrorMessage(error, "Login failed."),
       );
     } finally {
       setLoading(false);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 const PASSWORD_RESET_ENABLED = process.env.NEXT_PUBLIC_PASSWORD_RESET_ENABLED === "true";
 
@@ -38,18 +38,26 @@ export default function ResetPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password }),
       });
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (!response.ok) {
-        throw new Error(data.detail || "Could not reset your password.");
+        throw new Error(
+          typeof data.detail === "string"
+            ? data.detail
+            : "Could not reset your password.",
+        );
       }
 
       setComplete(true);
-      setMessage(data.message);
+      setMessage(
+        typeof data.message === "string"
+          ? data.message
+          : "Your password has been updated.",
+      );
       setPassword("");
       setConfirmPassword("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not reset your password.");
+      setMessage(apiErrorMessage(error, "Could not reset your password."));
     } finally {
       setLoading(false);
     }

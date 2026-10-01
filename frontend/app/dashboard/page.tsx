@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearAccessToken } from "../auth";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 type Document = {
   document_id: string;
@@ -44,13 +44,21 @@ export default function DashboardPage() {
           return;
         }
 
-        const data = await response.json();
+        const data = await readApiPayload(response);
 
         if (!response.ok) {
-          throw new Error(data.detail || "Could not load documents.");
+          throw new Error(
+            typeof data.detail === "string"
+              ? data.detail
+              : "Could not load documents.",
+          );
         }
 
-        setDocuments(data);
+        if (!Array.isArray(data)) {
+          throw new Error("The server returned an invalid document list.");
+        }
+
+        setDocuments(data as unknown as Document[]);
         // A transient request (including a cancelled Strict Mode request)
         // must not leave an old error banner above successfully loaded data.
         setMessage("");
@@ -60,11 +68,7 @@ export default function DashboardPage() {
           return;
         }
 
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : "Could not load documents.",
-        );
+        setMessage(apiErrorMessage(error, "Could not load documents."));
       })
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -111,11 +115,13 @@ export default function DashboardPage() {
         return;
       }
 
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (!response.ok) {
         throw new Error(
-          data.detail || "Could not delete document.",
+          typeof data.detail === "string"
+            ? data.detail
+            : "Could not delete document.",
         );
       }
 
@@ -126,11 +132,7 @@ export default function DashboardPage() {
         ),
       );
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not delete document.",
-      );
+      setMessage(apiErrorMessage(error, "Could not delete document."));
     }
   }
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 export default function VerifyEmailPage() {
   const [message, setMessage] = useState("Verifying your email...");
@@ -30,15 +30,23 @@ export default function VerifyEmailPage() {
       })
       .then(async (response) => {
         if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.detail || "Could not verify this email address.");
+          const data = await readApiPayload(response);
+          throw new Error(
+            typeof data.detail === "string"
+              ? data.detail
+              : "Could not verify this email address.",
+          );
         }
 
-        const data = await response.json();
-        setMessage(data.message);
+        const data = await readApiPayload(response);
+        setMessage(
+          typeof data.message === "string"
+            ? data.message
+            : "Email verified. You can now log in.",
+        );
       })
       .catch((error: unknown) => {
-        setMessage(error instanceof Error ? error.message : "Could not verify this email address.");
+        setMessage(apiErrorMessage(error, "Could not verify this email address."));
       });
   }, []);
 

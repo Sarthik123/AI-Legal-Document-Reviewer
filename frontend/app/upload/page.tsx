@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearAccessToken } from "../auth";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -90,7 +90,7 @@ export default function UploadPage() {
         }
       );
 
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (response.status === 401) {
         clearAccessToken();
@@ -99,17 +99,19 @@ export default function UploadPage() {
       }
 
       if (!response.ok) {
-        throw new Error(data.detail || "Upload failed.");
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : "Upload failed.",
+        );
+      }
+
+      if (typeof data.document_id !== "string" || !data.document_id) {
+        throw new Error("The server returned an invalid upload response.");
       }
 
       setDocumentId(data.document_id);
       setSuccessMessage("Uploaded successfully.");
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong during upload."
-      );
+      setMessage(apiErrorMessage(error, "Something went wrong during upload."));
     } finally {
       setUploading(false);
     }

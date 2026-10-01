@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState("");
@@ -20,15 +20,23 @@ export default function ResendVerificationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (!response.ok) {
-        throw new Error(data.detail || "Could not request a verification email.");
+        throw new Error(
+          typeof data.detail === "string"
+            ? data.detail
+            : "Could not request a verification email.",
+        );
       }
 
-      setMessage(data.message);
+      setMessage(
+        typeof data.message === "string"
+          ? data.message
+          : "If the account needs verification, an email will be sent.",
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not request a verification email.");
+      setMessage(apiErrorMessage(error, "Could not request a verification email."));
     } finally {
       setLoading(false);
     }

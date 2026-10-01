@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { API_URL } from "../api";
+import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -49,21 +49,21 @@ export default function RegisterPage() {
         },
       );
 
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (!response.ok) {
-        throw new Error(data.detail || "Registration failed.");
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : "Registration failed.",
+        );
       }
 
       setRegistrationSucceeded(true);
       setVerificationRequired(data.verification_required === true);
-      setMessage(data.message || "Account created.");
-    } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "Registration failed.",
+        typeof data.message === "string" ? data.message : "Account created.",
       );
+    } catch (error) {
+      setMessage(apiErrorMessage(error, "Registration failed."));
     } finally {
       setLoading(false);
     }

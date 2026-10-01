@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { clearAccessToken } from "../../auth";
-import { API_URL } from "../../api";
+import {
+  apiErrorMessage,
+  API_URL,
+  readApiPayload,
+} from "../../api";
 
 type DocumentData = {
   document_id: string;
@@ -91,21 +95,19 @@ export default function DocumentPage() {
           }
         );
 
-        const data = await response.json();
+        const data = await readApiPayload(response);
 
         if (!response.ok) {
           throw new Error(
-            data.detail || "Failed to analyze document."
+            typeof data.detail === "string"
+              ? data.detail
+              : "Failed to analyze document."
           );
         }
 
-        setAnalysis(data);
+        setAnalysis(data as unknown as DocumentAnalysis);
       } catch (error) {
-        setAnalysisError(
-          error instanceof Error
-            ? error.message
-            : "Failed to analyze document."
-        );
+        setAnalysisError(apiErrorMessage(error, "Failed to analyze document."));
       } finally {
         setAnalysisLoading(false);
       }
@@ -135,8 +137,7 @@ export default function DocumentPage() {
           }
         );
 
-        const documentData =
-          await documentResponse.json();
+        const documentData = await readApiPayload(documentResponse);
 
         if (documentResponse.status === 401) {
           clearAccessToken();
@@ -146,12 +147,14 @@ export default function DocumentPage() {
 
         if (!documentResponse.ok) {
           throw new Error(
-            documentData.detail ||
+            typeof documentData.detail === "string"
+              ? documentData.detail
+              :
               "Failed to load document."
           );
         }
 
-        setDocument(documentData);
+        setDocument(documentData as unknown as DocumentData);
 
         const pdfResponse = await fetch(
         `${API_URL}/documents/${documentId}/file`,
@@ -163,11 +166,12 @@ export default function DocumentPage() {
         );
 
         if (!pdfResponse.ok) {
-          const pdfError =
-            await pdfResponse.json();
+          const pdfError = await readApiPayload(pdfResponse);
 
           throw new Error(
-            pdfError.detail ||
+            typeof pdfError.detail === "string"
+              ? pdfError.detail
+              :
               "Failed to load PDF."
           );
         }
@@ -179,11 +183,7 @@ export default function DocumentPage() {
 
         setPdfUrl(objectUrl);
       } catch (error) {
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : "Failed to load document."
-        );
+        setMessage(apiErrorMessage(error, "Failed to load document."));
       } finally {
         setLoading(false);
       }
@@ -226,10 +226,10 @@ export default function DocumentPage() {
           return;
         }
 
-        const data = await response.json();
+        const data = await readApiPayload(response);
 
         setChatMessages(
-  (data.messages || []).map(
+  (Array.isArray(data.messages) ? data.messages : []).map(
     (message: ChatMessage) => ({
       role: message.role,
       content: message.content,
@@ -313,7 +313,7 @@ export default function DocumentPage() {
         }
       );
 
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (response.status === 401) {
         clearAccessToken();
@@ -323,15 +323,20 @@ export default function DocumentPage() {
 
       if (!response.ok) {
         throw new Error(
-          data.detail ||
+          typeof data.detail === "string"
+            ? data.detail
+            :
             "Failed to get a response."
         );
       }
 
       const assistantMessage: ChatMessage = {
         role: "assistant",
-        content: data.answer,
-        sources: data.sources || [],
+        content:
+          typeof data.answer === "string"
+            ? data.answer
+            : "The server returned an empty response.",
+        sources: Array.isArray(data.sources) ? data.sources as ChatSource[] : [],
       };
 
       setChatMessages((previous) => [
@@ -339,11 +344,7 @@ export default function DocumentPage() {
         assistantMessage,
       ]);
     } catch (error) {
-      setChatError(
-        error instanceof Error
-          ? error.message
-          : "Failed to get a response."
-      );
+      setChatError(apiErrorMessage(error, "Failed to get a response."));
     } finally {
       setChatSending(false);
     }
@@ -371,7 +372,7 @@ export default function DocumentPage() {
         }
       );
 
-      const data = await response.json();
+      const data = await readApiPayload(response);
 
       if (response.status === 401) {
         clearAccessToken();
@@ -381,18 +382,16 @@ export default function DocumentPage() {
 
       if (!response.ok) {
         throw new Error(
-          data.detail || "Failed to clear chat."
+          typeof data.detail === "string"
+            ? data.detail
+            : "Failed to clear chat."
         );
       }
 
       setChatMessages([]);
       setChatInput("");
     } catch (error) {
-      setChatError(
-        error instanceof Error
-          ? error.message
-          : "Failed to clear chat."
-      );
+      setChatError(apiErrorMessage(error, "Failed to clear chat."));
     }
   }
 
