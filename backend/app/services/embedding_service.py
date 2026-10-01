@@ -10,7 +10,7 @@ EMBEDDING_MODEL = os.getenv(
 _model = None
 
 
-def _cloudflare_embedding(text: str) -> list[float]:
+def _cloudflare_embeddings(texts: list[str]) -> list[list[float]]:
     account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
     model = os.getenv(
@@ -23,7 +23,7 @@ def _cloudflare_embedding(text: str) -> list[float]:
 
     request = urllib.request.Request(
         f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}",
-        data=json.dumps({"text": [text]}).encode("utf-8"),
+        data=json.dumps({"text": texts}).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -38,15 +38,21 @@ def _cloudflare_embedding(text: str) -> list[float]:
         raise RuntimeError("Cloudflare Workers AI embedding request failed.")
 
     vectors = payload.get("result", {}).get("data")
-    if not isinstance(vectors, list) or not vectors or not isinstance(vectors[0], list):
+    if (
+        not isinstance(vectors, list)
+        or len(vectors) != len(texts)
+        or any(not isinstance(vector, list) for vector in vectors)
+    ):
         raise RuntimeError("Cloudflare Workers AI returned an invalid embedding.")
 
-    embedding = vectors[0]
-    if len(embedding) != 384:
-        raise RuntimeError(
-            f"Embedding dimension {len(embedding)} does not match vector(384)."
-        )
-    return [float(value) for value in embedding]
+    result = []
+    for embedding in vectors:
+        if len(embedding) != 384:
+            raise RuntimeError(
+                f"Embedding dimension {len(embedding)} does not match vector(384)."
+            )
+        result.append([float(value) for value in embedding])
+    return result
 
 
 def get_embedding_model():
@@ -82,8 +88,15 @@ def release_embedding_model() -> None:
 
 
 def generate_embedding(text: str) -> list[float]:
-    if os.getenv("AI_PROVIDER", "ollama").strip().lower() == "cloudflare_workers_ai":
-        return _cloudflare_embedding(text)
+    return generate_embeddings([text])[0]
 
-    embedding = get_embedding_model().encode(text)
-    return embedding.tolist()
+
+def generate_embeddings(texts: list[str]) -> list[list[float]]:
+    if not texts:
+        return []
+
+    if os.getenv("AI_PROVIDER", "ollama").strip().lower() == "cloudflare_workers_ai":
+        return _cloudflare_embeddings(texts)
+
+    embeddings = get_embedding_model().encode(texts)
+    return embeddings.tolist()
