@@ -51,6 +51,9 @@ export default function DashboardPage() {
         }
 
         setDocuments(data);
+        // A transient request (including a cancelled Strict Mode request)
+        // must not leave an old error banner above successfully loaded data.
+        setMessage("");
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
