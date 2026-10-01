@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.user import User
-from app.services.analysis_service import analyze_document
+from app.services.analysis_service import AnalysisGenerationError, analyze_document
 from app.services.chat_service import chat_about_document
 from app.services.document_service import (
     extract_pages_from_pdf,
@@ -306,6 +306,13 @@ def analyze_document_route(
             user_id=current_user.id,
         )
 
+    except AnalysisGenerationError as error:
+        print(f"AI ANALYSIS ERROR: {type(error).__name__}: {error}", flush=True)
+        raise HTTPException(
+            status_code=502,
+            detail="Analysis could not be completed. Please try again.",
+        ) from error
+
     except ValueError as error:
         raise HTTPException(
             status_code=404,
@@ -317,7 +324,7 @@ def analyze_document_route(
         print(f"AI ANALYSIS ERROR: {error_detail}", flush=True)
         raise HTTPException(
             status_code=500,
-            detail=error_detail,
+            detail="Analysis could not be completed. Please try again.",
         ) from error
 
 @router.get("/documents/{document_id}/chat")

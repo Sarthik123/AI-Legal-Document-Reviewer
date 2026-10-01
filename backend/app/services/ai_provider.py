@@ -3,7 +3,11 @@ import os
 import urllib.request
 
 
-def call_model(messages: list[dict], max_tokens: int) -> str:
+def call_model(
+    messages: list[dict],
+    max_tokens: int,
+    response_format: dict | None = None,
+) -> str:
     provider = os.getenv("AI_PROVIDER", "ollama").strip().lower()
     if provider == "cloudflare_workers_ai":
         account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
@@ -20,6 +24,8 @@ def call_model(messages: list[dict], max_tokens: int) -> str:
             "max_tokens": max_tokens,
             "temperature": 0,
         }
+        if response_format:
+            payload["response_format"] = response_format
         request = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),
@@ -33,7 +39,12 @@ def call_model(messages: list[dict], max_tokens: int) -> str:
             result = json.loads(response.read().decode("utf-8"))
         if not result.get("success"):
             raise RuntimeError("Cloudflare Workers AI request failed.")
-        return str(result.get("result", {}).get("response", "")).strip()
+        content = result.get("result", {}).get("response", "")
+        # JSON Mode can return the response as an object. Serializing it here
+        # keeps the provider interface consistent for callers that parse JSON.
+        if isinstance(content, (dict, list)):
+            return json.dumps(content)
+        return str(content).strip()
 
     url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
     model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")

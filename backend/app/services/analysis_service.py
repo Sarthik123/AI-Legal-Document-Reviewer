@@ -9,6 +9,71 @@ from app.models.document_chunk import DocumentChunk
 from app.services.ai_provider import call_model
 
 
+_ANALYSIS_RESPONSE_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string"},
+            "key_points": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "risks": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "severity": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low"],
+                        },
+                        "description": {"type": "string"},
+                        "source": {"type": "integer"},
+                        "evidence": {"type": "string"},
+                    },
+                    "required": [
+                        "title",
+                        "severity",
+                        "description",
+                        "source",
+                        "evidence",
+                    ],
+                },
+            },
+            "missing_information": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "item": {"type": "string"},
+                        "description": {"type": "string"},
+                        "source": {"type": "integer"},
+                        "evidence": {"type": "string"},
+                    },
+                    "required": [
+                        "item",
+                        "description",
+                        "source",
+                        "evidence",
+                    ],
+                },
+            },
+        },
+        "required": [
+            "summary",
+            "key_points",
+            "risks",
+            "missing_information",
+        ],
+    },
+}
+
+
+class AnalysisGenerationError(RuntimeError):
+    """Raised when a provider cannot return a complete analysis object."""
+
 
 
 def _parse_json_content(content: str) -> dict:
@@ -33,12 +98,44 @@ def _parse_json_content(content: str) -> dict:
     return parsed
 
 
-def _call_ollama(prompt: str) -> dict:
-    return _parse_json_content(call_model([{"role": "user", "content": prompt}], 1024))
+def _analysis_response_format() -> dict | None:
+    if os.getenv("AI_PROVIDER", "ollama").strip().lower() == "cloudflare_workers_ai":
+        return _ANALYSIS_RESPONSE_SCHEMA
+    return None
 
 
-def _analysis_sources(chunks: list[DocumentChunk], budget: int = 30000):
-    """Choose representative chunks that fit the local model context window."""
+def _call_analysis_model(prompt: str) -> dict:
+    """Request an analysis object, retrying once if a provider truncates JSON."""
+    messages = [{"role": "user", "content": prompt}]
+    response_format = _analysis_response_format()
+    parse_error: json.JSONDecodeError | None = None
+
+    for attempt in range(2):
+        if attempt:
+            messages = [{
+                "role": "user",
+                "content": (
+                    f"{prompt}\n\nReturn the compact JSON object now. "
+                    "Do not add prose, Markdown, or incomplete fields."
+                ),
+            }]
+        content = call_model(
+            messages,
+            1536,
+            response_format=response_format,
+        )
+        try:
+            return _parse_json_content(content)
+        except json.JSONDecodeError as error:
+            parse_error = error
+
+    raise AnalysisGenerationError(
+        "The AI provider returned an incomplete analysis response."
+    ) from parse_error
+
+
+def _analysis_sources(chunks: list[DocumentChunk], budget: int = 14000):
+    """Choose representative chunks that fit the production model context window."""
     if sum(len(chunk.content) for chunk in chunks) <= budget:
         return list(enumerate(chunks, start=1))
 
@@ -341,16 +438,18 @@ STRICT RULES:
 - Do not invent legal risks simply because this is a legal-document product.
 - The summary must identify what the actual document is about.
 - Key points must be concrete facts from the document.
-- Maximum 5 key points.
-- Maximum 5 risks.
-- Maximum 5 missing-information items.
+- Maximum 5 key points, each under 160 characters.
+- Maximum 3 risks. Keep each title, description, and evidence concise.
+- Maximum 3 missing-information items. Keep each item and description concise.
 - severity must be exactly: high, medium, or low.
 - source must be one of the numbered sources provided above.
 - evidence must be copied from that exact source.
 - Keep evidence short and directly relevant.
+- Use clear, standard English for summaries, titles, descriptions, and key
+  points. Preserve the document text exactly only in the evidence field.
 """
 
-    result = _call_ollama(prompt)
+    result = _call_analysis_model(prompt)
 
     analysis = _validate_result(
         result,
