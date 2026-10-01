@@ -48,7 +48,7 @@ def r2_enabled() -> bool:
 
 def read_document(storage_path: str) -> BytesIO | Path:
     if storage_path.startswith("r2://"):
-        _, bucket, key = storage_path.split("/", 2)
+        bucket, key = _parse_r2_path(storage_path)
         response = _r2_client().get_object(Bucket=bucket, Key=key)
         return BytesIO(response["Body"].read())
     return Path(storage_path)
@@ -56,9 +56,18 @@ def read_document(storage_path: str) -> BytesIO | Path:
 
 def delete_document(storage_path: str) -> None:
     if storage_path.startswith("r2://"):
-        _, bucket, key = storage_path.split("/", 2)
+        bucket, key = _parse_r2_path(storage_path)
         _r2_client().delete_object(Bucket=bucket, Key=key)
         return
     path = Path(storage_path)
     if path.exists():
         path.unlink()
+
+
+def _parse_r2_path(storage_path: str) -> tuple[str, str]:
+    """Split an r2://bucket/key URI without treating the scheme as a path part."""
+    value = storage_path.removeprefix("r2://")
+    bucket, separator, key = value.partition("/")
+    if not separator or not bucket or not key:
+        raise ValueError("Invalid R2 storage path.")
+    return bucket, key
