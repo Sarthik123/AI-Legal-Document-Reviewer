@@ -26,7 +26,19 @@ def _cloudflare_ocr_text(value: object) -> str:
         return text
 
     if isinstance(value, dict):
-        for key in ("answer", "text", "response", "output", "result", "caption"):
+        # Workers AI vision models do not all use the same response key.
+        # Moondream returns ``answer`` while the previously configured LLaVA
+        # model returns ``description``. Accept both so a valid provider
+        # response cannot be mistaken for an OCR failure.
+        for key in (
+            "answer",
+            "text",
+            "response",
+            "output",
+            "result",
+            "caption",
+            "description",
+        ):
             text = _cloudflare_ocr_text(value.get(key))
             if text:
                 return text
@@ -144,15 +156,28 @@ def _extract_pages_with_cloudflare_ocr(
                     "Mark unreadable text as [illegible]. Return only the transcription."
                 )
             )
-            request = urllib.request.Request(
-                endpoint,
-                data=json.dumps({
+            # Older Render environments used Cloudflare's LLaVA model. Its
+            # API accepts ``prompt`` and returns ``description``; Moondream
+            # accepts ``task``/``question`` and returns ``answer``. Support
+            # both configurations while preserving the current default.
+            if "llava" in model.lower():
+                request_payload = {
+                    "image": image_uri,
+                    "prompt": question,
+                    "max_tokens": 4096,
+                }
+            else:
+                request_payload = {
                     "task": "query",
                     "image": image_uri,
                     "reasoning": False,
                     "max_tokens": 4096,
                     "question": question,
-                }).encode("utf-8"),
+                }
+
+            request = urllib.request.Request(
+                endpoint,
+                data=json.dumps(request_payload).encode("utf-8"),
                 headers={
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json",

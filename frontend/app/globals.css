@@ -831,10 +831,18 @@ summary {
 /* Landing page shares the same palette and type scale */
 .landing-page {
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 17% 15%, rgb(220 227 255 / 72%), transparent 34rem),
-    radial-gradient(ellipse at 88% 78%, rgb(219 243 237 / 68%), transparent 30rem),
-    #f7f8fc;
+  background-image:
+    linear-gradient(
+      112deg,
+      rgb(248 249 253 / 90%) 0%,
+      rgb(247 248 252 / 84%) 52%,
+      rgb(241 245 250 / 76%) 100%
+    ),
+    radial-gradient(ellipse at 17% 15%, rgb(220 227 255 / 58%), transparent 34rem),
+    radial-gradient(ellipse at 88% 78%, rgb(219 243 237 / 54%), transparent 30rem),
+    url("/images/legal-review-hero-background.png");
+  background-position: center, 17% 15%, 88% 78%, center;
+  background-size: cover, auto, auto, cover;
 }
 
 .landing-page > section {

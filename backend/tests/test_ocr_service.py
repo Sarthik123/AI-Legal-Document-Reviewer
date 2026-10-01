@@ -83,6 +83,31 @@ class CloudflareOCRTests(unittest.TestCase):
         "AI_PROVIDER": "cloudflare_workers_ai",
         "CLOUDFLARE_ACCOUNT_ID": "test-account",
         "CLOUDFLARE_API_TOKEN": "test-token",
+        "CLOUDFLARE_OCR_MODEL": "@cf/llava-hf/llava-1.5-7b-hf",
+    })
+    @patch("app.services.ocr_service.urllib.request.urlopen")
+    def test_legacy_llava_response_and_payload_are_supported(self, urlopen):
+        response = MagicMock()
+        response.__enter__.return_value = BytesIO(json.dumps({
+            "success": True,
+            "result": {"description": "Legacy LLaVA OCR text."},
+        }).encode("utf-8"))
+        urlopen.return_value = response
+
+        pages = extract_pages_with_ocr(str(self.scanned_pdf))
+
+        self.assertEqual(pages, [(1, "Legacy LLaVA OCR text.")])
+        request = urlopen.call_args.args[0]
+        self.assertIn("@cf/llava-hf/llava-1.5-7b-hf", request.full_url)
+        payload = json.loads(request.data)
+        self.assertIn("prompt", payload)
+        self.assertNotIn("task", payload)
+        self.assertNotIn("question", payload)
+
+    @patch.dict(os.environ, {
+        "AI_PROVIDER": "cloudflare_workers_ai",
+        "CLOUDFLARE_ACCOUNT_ID": "test-account",
+        "CLOUDFLARE_API_TOKEN": "test-token",
     })
     @patch("app.services.ocr_service.urllib.request.urlopen")
     def test_cloudflare_ocr_retries_an_empty_response(self, urlopen):
