@@ -40,7 +40,7 @@ Introduce validated environment configuration before deployment. At minimum, sup
 | `JWT_SECRET_KEY` | Authentication signing key, managed and rotated outside source control |
 | `CORS_ORIGINS` | Explicit approved browser origins, including lawyerlens.in and www.lawyerlens.in |
 | `NEXT_PUBLIC_API_URL` | Public API base URL used by the frontend |
-| `AI_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_AI_MODEL` | Production Workers AI configuration |
+| `AI_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_AI_MODEL`, `CLOUDFLARE_EMBEDDING_MODEL`, `CLOUDFLARE_OCR_MODEL` | Production Workers AI configuration; OCR model override is optional |
 | `EMBEDDING_MODEL` | Approved local embedding model, initially `sentence-transformers/all-MiniLM-L6-v2` |
 | `EMAIL_PROVIDER`, `BREVO_API_KEY`, `BREVO_FROM_EMAIL`, `BREVO_FROM_NAME` | Production Brevo HTTPS email configuration |
 | `APP_BASE_URL` | Base URL used in verification and password-reset links |

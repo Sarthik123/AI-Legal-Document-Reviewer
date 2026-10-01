@@ -81,7 +81,7 @@ def health_check():
 
 
 @router.post("/documents")
-async def upload_document(
+def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -92,8 +92,8 @@ async def upload_document(
             detail="Only PDF documents are supported.",
         )
 
-    file_data = await file.read()
     max_file_size = 10 * 1024 * 1024
+    file_data = file.file.read(max_file_size + 1)
 
     if len(file_data) > max_file_size:
         raise HTTPException(

@@ -55,6 +55,7 @@ AI_PROVIDER=cloudflare_workers_ai
 CLOUDFLARE_ACCOUNT_ID
 CLOUDFLARE_API_TOKEN
 CLOUDFLARE_AI_MODEL=@cf/meta/llama-3.1-8b-instruct
+CLOUDFLARE_OCR_MODEL=@cf/moondream/moondream3.1-9B-A2B
 
 EMAIL_PROVIDER=brevo_api
 BREVO_API_KEY
@@ -150,8 +151,11 @@ Root directory is the repository root.
 - AI errors: check Workers AI account ID, token permissions, and model name.
 - Upload errors: check R2 variables and bucket permissions.
 - Database errors: check `DATABASE_URL`, Neon status, pgvector, and migrations.
-- Out-of-memory errors: keep one Render worker and preserve lazy OCR/embedding
-  loading; large scanned documents may require smaller files or a larger plan.
+- Scanned-PDF upload errors: production OCR and embeddings use Cloudflare Workers AI;
+  check the Cloudflare account ID, token permissions, model availability, and daily
+  free allocation. Local development continues to use EasyOCR and local embeddings.
+- Out-of-memory errors: keep one Render worker; local EasyOCR and embeddings are
+  lazy-loaded and are not loaded by the production Cloudflare path.
 
 ## Security rules
 
