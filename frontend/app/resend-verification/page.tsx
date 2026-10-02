@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { apiErrorMessage, apiFetch, API_URL, readApiPayload } from "../api";
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState("");
@@ -15,7 +15,7 @@ export default function ResendVerificationPage() {
     setMessage("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/verification/request`, {
+      const response = await apiFetch(`${API_URL}/auth/verification/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

@@ -2,7 +2,7 @@ name: Application E2E
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, codex/staging-reliability]
   pull_request:
     branches: [main, master]
 
@@ -67,6 +67,19 @@ jobs:
         run: |
           .venv/bin/python -c 'from sqlalchemy import create_engine, text; engine=create_engine("postgresql+psycopg://sarthikbhan@localhost:5432/ai_legal_reviewer"); connection=engine.connect(); connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector")); connection.commit(); connection.close()'
           .venv/bin/python -c 'import app.models.chat, app.models.document, app.models.document_chunk, app.models.user; from app.database import Base, engine; Base.metadata.create_all(bind=engine); print("Application schema ready")'
+          .venv/bin/python - <<'PY'
+          from pathlib import Path
+          from sqlalchemy import create_engine
+
+          engine = create_engine("postgresql+psycopg://sarthikbhan@localhost:5432/ai_legal_reviewer")
+          with engine.begin() as connection:
+              for migration_name in (
+                  "migrations/20261002_document_processing_jobs.sql",
+                  "migrations/20261002_processing_error.sql",
+              ):
+                  connection.exec_driver_sql(Path(migration_name).read_text())
+          print("Staging migrations applied")
+          PY
 
       - name: Start Ollama and load the local model
         run: |

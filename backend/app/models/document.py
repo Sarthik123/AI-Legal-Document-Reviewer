@@ -21,6 +21,11 @@ class Document(Base):
         nullable=False,
     )
 
+    processing_error: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
     text_length: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,

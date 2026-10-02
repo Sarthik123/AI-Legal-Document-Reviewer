@@ -1,0 +1,71 @@
+# Render Blueprint for the isolated staging API.
+# Apply this file as a new Render service; do not attach it to production.
+services:
+  - type: web
+    name: ai-legal-reviewer-staging
+    runtime: python
+    region: singapore
+    plan: starter
+    branch: codex/staging-reliability
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: ENVIRONMENT
+        value: staging
+      - key: PROCESSING_MODE
+        value: async
+      - key: PROCESSING_WORKER_ENABLED
+        value: "true"
+      - key: DB_POOL_SIZE
+        value: "2"
+      - key: DB_MAX_OVERFLOW
+        value: "2"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: AI_PROVIDER
+        value: cloudflare_workers_ai
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: CLOUDFLARE_AI_MODEL
+        value: "@cf/meta/llama-3.1-8b-instruct"
+      - key: CLOUDFLARE_EMBEDDING_MODEL
+        value: "@cf/baai/bge-small-en-v1.5"
+      - key: CLOUDFLARE_OCR_MODEL
+        value: "@cf/moondream/moondream3.1-9B-A2B"
+      - key: EMAIL_PROVIDER
+        value: brevo_api
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_FROM_EMAIL
+        sync: false
+      - key: BREVO_FROM_NAME
+        value: AI Legal Reviewer Staging
+      - key: EMAIL_VERIFICATION_ENABLED
+        value: "true"
+      - key: PASSWORD_RESET_ENABLED
+        value: "false"
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_REGION
+        value: auto
+      - key: SENTRY_DSN
+        sync: false
+      - key: RELEASE_VERSION
+        sync: false

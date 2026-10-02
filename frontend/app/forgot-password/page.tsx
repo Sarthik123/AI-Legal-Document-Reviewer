@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { apiErrorMessage, apiFetch, API_URL, readApiPayload } from "../api";
 
 const PASSWORD_RESET_ENABLED = process.env.NEXT_PUBLIC_PASSWORD_RESET_ENABLED === "true";
 
@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
     setMessage("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/password-reset/request`, {
+      const response = await apiFetch(`${API_URL}/auth/password-reset/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

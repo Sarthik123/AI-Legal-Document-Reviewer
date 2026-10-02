@@ -1,31 +1,26 @@
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+import os
 from typing import Literal
 from uuid import uuid4
 
 from app.models.chat import ChatMessage
+from app.models.document_chunk import DocumentChunk
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.auth import get_current_user
 from app.database import get_db
 from app.models.document import Document
-from app.models.document_chunk import DocumentChunk
 from app.models.user import User
 from app.services.analysis_service import AnalysisGenerationError, analyze_document
 from app.services.chat_service import chat_about_document
-from app.services.document_service import (
-    extract_pages_from_pdf,
-    pages_requiring_ocr,
+from app.services.document_processing import (
+    enqueue_document_job,
+    process_document,
 )
-from app.services.ocr_service import (
-    extract_pages_with_ocr,
-)
-
-from app.services.rag_service import process_document_chunks
 from app.services.qa_service import sanitize_citation
 from app.services.storage_service import delete_document as delete_stored_document, read_document, save_document
 
@@ -130,101 +125,44 @@ def upload_document(
     db.add(document)
     db.commit()
 
-    with NamedTemporaryFile(
-        suffix=".pdf",
-        delete=False,
-    ) as temp_file:
-        temp_file.write(file_data)
-        temp_path = temp_file.name
+    enqueue_document_job(db, document_id)
 
-    try:
-        pages = extract_pages_from_pdf(temp_path)
-        ocr_page_numbers = pages_requiring_ocr(temp_path, pages)
-
-        if ocr_page_numbers:
-            ocr_pages = dict(
-                extract_pages_with_ocr(
-                    temp_path,
-                    page_numbers=ocr_page_numbers,
-                )
-            )
-            pages = [
-                (
-                    page_number,
-                    ocr_pages.get(page_number, page_text)
-                    if page_number in ocr_page_numbers
-                    else page_text,
-                )
-                for page_number, page_text in pages
-            ]
-
-        extracted_text = "\n".join(
-            text
-            for _, text in pages
-            if text
-        ).strip()
-
-        if not extracted_text:
-            raise ValueError(
-                "No readable text could be extracted from this PDF."
-            )
-
-        document.text_length = len(extracted_text)
-        document.processing_status = "processing"
-        db.commit()
-
-        chunk_count = process_document_chunks(
-           db=db,
-           document_id=document_id,
-           pages=pages,
+    async_processing = (
+        os.getenv("PROCESSING_MODE", "sync").strip().lower()
+        in {"async", "background", "queue"}
+    )
+    if async_processing:
+        return JSONResponse(
+            status_code=202,
+            content={
+                "document_id": document_id,
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "processing_status": "queued",
+                "message": "PDF uploaded and queued for processing.",
+            },
         )
 
-        document.processing_status = "processed"
-        db.commit()
-
-        return {
-            "document_id": document_id,
-            "filename": file.filename,
-            "content_type": file.content_type,
-            "text_length": len(extracted_text),
-            "chunk_count": chunk_count,
-            "message": (
-                "PDF uploaded, processed, chunked, and embedded successfully."
-            ),
-        }
-    except Exception as error:
-        print(
-            f"DOCUMENT PROCESSING ERROR: {type(error).__name__}: {error}",
-            flush=True,
-        )
-        db.query(DocumentChunk).filter(
-            DocumentChunk.document_id == document_id,
-        ).delete(synchronize_session=False)
-
-        delete_stored_document(document.storage_path)
-
-        db.delete(document)
-        db.commit()
-
-        error_text = str(error)
-        if "No readable text" in error_text:
-            user_message = (
-                "No readable text was found in this PDF. Upload a clearer PDF "
-                "or one with selectable text."
-            )
-        elif "OCR" in error_text:
-            user_message = (
-                "The OCR service is temporarily unavailable. Please try again."
-            )
-        else:
-            user_message = "Document processing could not be completed. Please try again."
-
+    status, error_message = process_document(document_id, retry=False)
+    if status != "processed":
         raise HTTPException(
             status_code=500,
-            detail=user_message,
+            detail=error_message or "Document processing could not be completed. Please try again.",
         )
-    finally:
-        Path(temp_path).unlink(missing_ok=True)
+
+    refreshed_document = db.query(Document).filter(Document.id == document_id).first()
+    chunk_count = db.query(DocumentChunk).filter(
+        DocumentChunk.document_id == document_id,
+    ).count()
+    return {
+        "document_id": document_id,
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "processing_status": refreshed_document.processing_status if refreshed_document else "processed",
+        "text_length": refreshed_document.text_length if refreshed_document else None,
+        "chunk_count": chunk_count,
+        "message": "PDF uploaded, processed, chunked, and embedded successfully.",
+    }
 
 
 @router.get("/documents")
@@ -245,6 +183,7 @@ def list_documents(
             "filename": document.filename,
             "content_type": document.content_type,
             "processing_status": document.processing_status,
+            "processing_error": document.processing_error,
             "text_length": document.text_length,
             "created_at": document.created_at,
         }
@@ -278,6 +217,7 @@ def get_document(
         "filename": document.filename,
         "content_type": document.content_type,
         "processing_status": document.processing_status,
+        "processing_error": document.processing_error,
         "text_length": document.text_length,
         "created_at": document.created_at,
     }
@@ -318,6 +258,27 @@ def analyze_document_route(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    document = (
+        db.query(Document)
+        .filter(
+            Document.id == document_id,
+            Document.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if document.processing_status != "processed":
+        if document.processing_status == "failed":
+            raise HTTPException(
+                status_code=422,
+                detail=document.processing_error or "Document processing failed. Please try again.",
+            )
+        raise HTTPException(
+            status_code=409,
+            detail="Document is still processing. Please try again shortly.",
+        )
+
     try:
         return analyze_document(
             db=db,

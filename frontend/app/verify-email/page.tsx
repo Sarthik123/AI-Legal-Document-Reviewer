@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { apiErrorMessage, apiFetch, API_URL, readApiPayload } from "../api";
 
 export default function VerifyEmailPage() {
   const [message, setMessage] = useState("Verifying your email...");
@@ -22,7 +22,7 @@ export default function VerifyEmailPage() {
           throw new Error("The verification link is missing its token.");
         }
 
-        return fetch(`${API_URL}/auth/verify-email`, {
+        return apiFetch(`${API_URL}/auth/verify-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),

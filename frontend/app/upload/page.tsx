@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearAccessToken } from "../auth";
-import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { apiErrorMessage, apiFetch, API_URL, readApiPayload } from "../api";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -93,10 +93,11 @@ export default function UploadPage() {
     setSuccessMessage("");
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/documents`,
         {
           method: "POST",
+          timeoutMs: 180_000,
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -192,9 +193,18 @@ export default function UploadPage() {
           )}
 
           {message && (
-            <p className="mt-4 text-red-600">
-              {message}
-            </p>
+            <div className="mt-4 flex items-center justify-between gap-4 text-red-600">
+              <p>{message}</p>
+              {!uploading && !documentId && selectedFile && (
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  className="flex-shrink-0 rounded-lg border border-red-200 px-3 py-1 text-sm font-medium hover:bg-red-50"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           )}
 
           <p className="mt-4 text-sm text-gray-500">

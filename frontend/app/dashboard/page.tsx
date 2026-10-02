@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearAccessToken } from "../auth";
-import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { apiErrorMessage, apiFetch, API_URL, readApiPayload } from "../api";
 
 type Document = {
   document_id: string;
@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -31,7 +32,7 @@ export default function DashboardPage() {
 
     const controller = new AbortController();
 
-    fetch(`${API_URL}/documents`, {
+    apiFetch(`${API_URL}/documents`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -77,7 +78,7 @@ export default function DashboardPage() {
       });
 
     return () => controller.abort();
-  }, [router]);
+  }, [reloadKey, router]);
 
   async function deleteDocument(
     documentId: string,
@@ -99,7 +100,7 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/documents/${documentId}`,
         {
           method: "DELETE",
@@ -162,9 +163,20 @@ export default function DashboardPage() {
         </header>
 
         {message && (
-          <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
-            {message}
-          </p>
+          <div className="mt-6 flex items-center justify-between gap-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+            <p>{message}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setMessage("");
+                setLoading(true);
+                setReloadKey((value) => value + 1);
+              }}
+              className="flex-shrink-0 rounded-lg border border-red-200 px-3 py-1 font-medium hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
         )}
 
         {loading ? (

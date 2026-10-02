@@ -7,9 +7,9 @@ This plan describes the work required before the AI Legal Document Reviewer can 
 - Database, backend, Ollama, and frontend addresses are hard-coded for local development.
 - Uploaded PDFs are stored on the backend's local filesystem. There is no production object-storage adapter or retention policy.
 - The backend has no migration framework or established upgrade/rollback process.
-- Document processing, OCR, embeddings, and model requests run synchronously in upload/request handlers.
+- The staging branch now has a durable document-processing queue, bounded retries, stale-job recovery, and user-visible processing states. Production still requires the migration and worker service to be promoted together.
 - Email verification and expiring password-reset flows are implemented. Password reset is disabled by default until SMTP delivery is verified; enable it explicitly on both the backend and frontend when ready. Refresh/revocation, MFA, and account-deletion flows are absent; the browser stores access tokens in local storage.
-- Rate limits, production TLS, centralized monitoring, and alerting are not configured.
+- Browser retries, request IDs, optional Sentry reporting, and scheduled health checks are implemented on the staging branch. Rate limits, production TLS, centralized dashboards, and alert routing still need provider configuration.
 - Production capacity, AI quality thresholds, privacy terms, and service objectives have not been approved.
 
 ## 2. Security Hardening
@@ -68,7 +68,7 @@ Do not commit production values, certificates, passwords, or signing keys. Valid
 - Run behind a TLS-terminating ingress or reverse proxy with explicit health and readiness checks.
 - Configure outbound access only to PostgreSQL, private object storage, Ollama, and approved telemetry endpoints.
 - Preload and pin the approved embedding and Ollama models. Verify model files and licenses before each upgrade.
-- Move long-running extraction, OCR, embedding, and analysis work to a durable background queue before accepting production-scale traffic. Return a persistent processing state and support safe retries.
+- The staging implementation moves long-running extraction, OCR, and embedding work to a durable background queue, returns a persistent processing state, retries failed jobs, and recovers stale worker leases. Promote it to production only after the staging migration and worker have been verified together.
 - Set worker and request timeouts based on measured CPU/GPU performance and the documented upload limits.
 
 ## 7. Production PostgreSQL
@@ -190,4 +190,4 @@ Do not commit production values, certificates, passwords, or signing keys. Valid
 
 ## Production-Readiness Status
 
-The MVP is verified locally by the Playwright user journey, but it is **not production-ready**. A rotated Brevo SMTP key and a verified sender on an authenticated domain must be configured before reliable verification and reset email delivery can be confirmed; the password-reset feature flags should remain off until that verification is complete. Production environment configuration, migrations, durable storage, hardened sessions, asynchronous processing, rate limiting, privacy/deletion controls, monitoring, and recovery procedures remain to be implemented and reviewed. No deployment has been performed.
+The MVP is verified locally by the Playwright user journey (8 browser tests pass), and the staging reliability implementation is on the isolated `codex/staging-reliability` branch. It is **not production-ready for this branch** until the separate Neon, Render, Vercel, R2, Brevo, and monitoring settings are configured and the staging gates pass. A verified Brevo sender and authenticated domain are still required for reliable email delivery; keep password reset disabled until that is confirmed. Do not promote this branch to production until the staging migration, queue worker, E2E run, health monitor, and manual smoke test all pass.

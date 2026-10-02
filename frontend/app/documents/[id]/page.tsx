@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { clearAccessToken } from "../../auth";
 import {
   apiErrorMessage,
+  apiFetch,
   API_URL,
   readApiPayload,
 } from "../../api";
@@ -14,6 +15,7 @@ type DocumentData = {
   filename: string;
   content_type: string;
   processing_status: string;
+  processing_error: string | null;
   text_length: number | null;
   created_at: string;
 };
@@ -69,6 +71,7 @@ export default function DocumentPage() {
     useState(false);
   const [analysisError, setAnalysisError] =
     useState("");
+  const [analysisRetryKey, setAnalysisRetryKey] = useState(0);
 
   const chatContainerRef =
     useRef<HTMLDivElement | null>(null);
@@ -77,7 +80,16 @@ export default function DocumentPage() {
     async function runAnalysis() {
       const token = localStorage.getItem("access_token");
 
-      if (!token) {
+      if (!token || !document) {
+        return;
+      }
+
+      if (document.processing_status !== "processed") {
+        setAnalysisLoading(false);
+        setAnalysisError(
+          document.processing_error ||
+            "Document is still processing. This page will update automatically.",
+        );
         return;
       }
 
@@ -85,7 +97,7 @@ export default function DocumentPage() {
       setAnalysisError("");
 
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `${API_URL}/documents/${documentId}/analyze`,
           {
             method: "POST",
@@ -114,7 +126,37 @@ export default function DocumentPage() {
     }
 
     runAnalysis();
-  }, [documentId]);
+  }, [analysisRetryKey, document, documentId]);
+
+  useEffect(() => {
+    if (
+      !document ||
+      document.processing_status === "processed" ||
+      document.processing_status === "failed"
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      try {
+        const response = await apiFetch(
+          `${API_URL}/documents/${documentId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (response.ok) {
+          const data = await readApiPayload(response);
+          setDocument(data as unknown as DocumentData);
+        }
+      } catch {
+        // The normal request retry policy handles transient polling failures.
+      }
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [document, documentId]);
 
   useEffect(() => {
     let objectUrl = "";
@@ -128,7 +170,7 @@ export default function DocumentPage() {
       }
 
       try {
-        const documentResponse = await fetch(
+        const documentResponse = await apiFetch(
         `${API_URL}/documents/${documentId}`,
           {
             headers: {
@@ -156,7 +198,7 @@ export default function DocumentPage() {
 
         setDocument(documentData as unknown as DocumentData);
 
-        const pdfResponse = await fetch(
+        const pdfResponse = await apiFetch(
         `${API_URL}/documents/${documentId}/file`,
           {
             headers: {
@@ -207,7 +249,7 @@ export default function DocumentPage() {
       }
 
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `${API_URL}/documents/${documentId}/chat`,
           {
             headers: {
@@ -298,7 +340,7 @@ export default function DocumentPage() {
     setChatSending(true);
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/documents/${documentId}/chat`,
         {
           method: "POST",
@@ -362,7 +404,7 @@ export default function DocumentPage() {
     try {
       setChatError("");
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/documents/${documentId}/chat`,
         {
           method: "DELETE",
@@ -526,6 +568,18 @@ export default function DocumentPage() {
               <p className="text-sm text-red-700">
                 {analysisError}
               </p>
+              {document.processing_status === "processed" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnalysisError("");
+                    setAnalysisRetryKey((value) => value + 1);
+                  }}
+                  className="mt-3 rounded-lg border border-red-200 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-100"
+                >
+                  Retry analysis
+                </button>
+              )}
             </div>
           )}
 

@@ -31,6 +31,11 @@ npx playwright test
 Production architecture, security hardening, deployment sequencing, and the
 release checklist are documented in [docs/POST-MVP-PLAN.md](docs/POST-MVP-PLAN.md).
 
+The isolated staging release process is documented in
+[docs/STAGING-ENVIRONMENT.md](docs/STAGING-ENVIRONMENT.md). Push staging work
+to the `codex/staging-reliability` branch; do not test new infrastructure on
+the production branch.
+
 ## Portfolio and interview guide
 
 See [docs/GUIDE.md](docs/GUIDE.md) for a short,

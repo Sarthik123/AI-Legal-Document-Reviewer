@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { storeAccessToken } from "../auth";
-import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { apiErrorMessage, apiFetch, API_URL, readApiPayload } from "../api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,7 +26,7 @@ export default function LoginPage() {
       formData.append("username", email);
       formData.append("password", password);
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/auth/token`,
         {
           method: "POST",
