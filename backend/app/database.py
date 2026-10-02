@@ -19,8 +19,10 @@ elif DATABASE_URL.startswith("postgresql://"):
 
 engine = create_engine(
     DATABASE_URL,
-    pool_size=int(os.getenv("DB_POOL_SIZE", "1")),
-    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "0")),
+    # Keep at least one connection available for API status requests while a
+    # background document worker is processing a long PDF.
+    pool_size=int(os.getenv("DB_POOL_SIZE", "2")),
+    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "2")),
     pool_pre_ping=True,
 )
 

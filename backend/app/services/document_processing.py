@@ -47,8 +47,8 @@ def _friendly_processing_error(error: Exception) -> str:
     return "Document processing could not be completed. Please try again."
 
 
-def _write_stored_document_to_temp(document: Document) -> str:
-    stored_document = read_document(document.storage_path)
+def _write_stored_document_to_temp(storage_path: str) -> str:
+    stored_document = read_document(storage_path)
     with NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
         if isinstance(stored_document, Path):
             temp_file.write(stored_document.read_bytes())
@@ -86,7 +86,11 @@ def process_document(
             job.attempts += 1
         db.commit()
 
-        temp_path = _write_stored_document_to_temp(document)
+        storage_path = document.storage_path
+        db.close()
+        db = SessionLocal()
+
+        temp_path = _write_stored_document_to_temp(storage_path)
         pages = extract_pages_from_pdf(temp_path)
         ocr_page_numbers = pages_requiring_ocr(temp_path, pages)
 
@@ -111,16 +115,29 @@ def process_document(
         if not extracted_text:
             raise ValueError("No readable text could be extracted from this PDF.")
 
+        db.close()
+        db = SessionLocal()
+        document = db.query(Document).filter(Document.id == document_id).first()
+        if not document:
+            return "missing", "Document not found."
         document.text_length = len(extracted_text)
         document.processing_status = "processing"
         db.commit()
 
+        db.close()
+        db = SessionLocal()
         process_document_chunks(
             db=db,
             document_id=document_id,
             pages=pages,
         )
 
+        db.close()
+        db = SessionLocal()
+        document = db.query(Document).filter(Document.id == document_id).first()
+        job = db.query(DocumentJob).filter(DocumentJob.document_id == document_id).first()
+        if not document:
+            return "missing", "Document not found."
         document.processing_status = "processed"
         document.processing_error = None
         if job:
@@ -193,7 +210,9 @@ def run_one_queued_job() -> bool:
         job = _claim_next_job(db)
         if not job:
             return False
-        process_document(job.document_id)
+        document_id = job.document_id
+        db.close()
+        process_document(document_id)
         return True
     finally:
         db.close()
