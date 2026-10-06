@@ -133,7 +133,7 @@ As a Startup Founder, when I review a legal document, I want to identify importa
 
 ### 6.5 Individual Consumer
 
-As an Individual Consumer, I want to quickly understand the key points and obligations in my legal document so I can save time and make informed decisions.
+As an Individual Consumer, I want to quickly understand the key terms and obligations in my legal document so I can save time and make informed decisions.
 
 ### 6.6 Small Business Owner
 
@@ -199,7 +199,6 @@ The system shall clearly communicate document-processing or AI-analysis failures
 - The system shall provide processing feedback shortly after document submission.
 - Document analysis shall complete within an agreed latency target based on document size and complexity.
 - The system shall provide users with clear processing status when analysis takes longer than expected.
-- The first request after an idle period shall not delay feedback beyond the agreed latency target. The production API currently runs on Render's free plan, which sleeps after about 15 minutes without traffic and can take more than a minute to wake.
 
 ### 8.3 Security and Privacy
 
@@ -374,7 +373,6 @@ The product shall support informed decision-making rather than presenting itself
 - Automated negotiation with counterparties
 - Tax/accounting workflows
 - Guaranteed legal outcomes
-- Self-service password reset
 
 ---
 
@@ -386,6 +384,7 @@ The product shall support informed decision-making rather than presenting itself
 2. Existing users can securely authenticate.
 3. Invalid authentication attempts are rejected with appropriate error messages.
 4. Unauthenticated users cannot access another user's documents or account data.
+5. Users can securely recover access to their account.
 
 ### 12.2 Document Upload
 
@@ -484,10 +483,6 @@ Legal documents may contain confidential or sensitive information, creating sign
 
 The product may face legal or regulatory requirements depending on its jurisdiction, positioning, and use cases.
 
-#### Server Cold Starts
-
-The production API runs on Render's free plan, which sleeps after about 15 minutes without traffic. The first visitor after a quiet period can wait more than a minute for sign-up, login, or upload to respond, which may look like the product is broken. An always-on paid instance removes this delay.
-
 #### Poor Document Quality
 
 Scanned, incomplete, poorly formatted, or low-quality documents may reduce analysis quality.
@@ -540,8 +535,10 @@ Incorrect or unsupported AI responses may reduce user confidence and adoption.
 
 13. How should the product communicate that it is not a replacement for professional legal advice?
 
-14. Which AI model(s) should be used for the MVP?
+14. Which document types or use cases should the system refuse to analyse?
 
-15. What maximum latency is acceptable for document processing and AI responses?
+15. Which AI model(s) should be used for the MVP?
 
-16. Which jurisdictions should the product support initially?
+16. What maximum latency is acceptable for document processing and AI responses?
+
+17. Which jurisdictions should the product support initially?

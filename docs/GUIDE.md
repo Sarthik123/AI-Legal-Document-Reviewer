@@ -220,10 +220,6 @@ Root directory is the repository root.
 
 ## Troubleshooting
 
-- First request takes over a minute: the API is on Render's free plan, which
-  sleeps after about 15 minutes without traffic and wakes on the next request.
-  Wait for `https://api.lawyerlens.in/health` to respond, then retry. Moving the
-  API to an always-on paid instance removes the delay.
 - Website opens but signup/login hangs: check `https://api.lawyerlens.in/health`,
   Render logs, Render service status, and CORS variables.
 - `404` on document APIs: check the access token and document ownership.

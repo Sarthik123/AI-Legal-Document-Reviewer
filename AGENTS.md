@@ -221,15 +221,16 @@ Include:
 8. Production file storage
 9. HTTPS and domain configuration
 10. Authentication hardening
-11. Logging and monitoring
-12. Error tracking
-13. CI/CD
-14. Automated testing in CI
-15. Backup and recovery
-16. Privacy and data deletion
-17. Cost considerations
-18. Exact deployment sequence
-19. Final production checklist
+11. Rate limiting
+12. Logging and monitoring
+13. Error tracking
+14. CI/CD
+15. Automated testing in CI
+16. Backup and recovery
+17. Privacy and data deletion
+18. Cost considerations
+19. Exact deployment sequence
+20. Final production checklist
 
 Do not deploy anything automatically without explicit user approval.
 
