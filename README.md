@@ -19,8 +19,7 @@ npm run dev
 The backend expects PostgreSQL with pgvector. Local development can use
 Ollama; production uses Cloudflare Workers AI and the Brevo HTTPS API.
 Copy the example environment files before configuring local email or a
-non-local API URL. Password reset remains disabled by default until email
-delivery is verified.
+non-local API URL. Password reset is out of scope and stays disabled.
 
 Run the browser regression suite from the repository root:
 
