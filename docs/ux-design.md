@@ -273,6 +273,10 @@ This may take a moment.
 
 The user should not be forced to remain on the screen if processing is asynchronous.
 
+### Slow First Response
+
+The production API runs on Render's free plan and sleeps after about 15 minutes without traffic. The first sign-up, login, or upload after a quiet period can take more than a minute while the server wakes. Until the API runs on an always-on instance, the interface should tell the user that the service is starting up rather than appearing frozen.
+
 ---
 
 ## 11. Document Overview
@@ -331,26 +335,7 @@ Important document-specific claims should be traceable to supporting document ev
 
 ---
 
-## 13. Key Terms
-
-The product may display important extracted terms separately from the general summary.
-
-Potential terms include:
-
-* Contract duration
-* Payment terms
-* Termination
-* Renewal
-* Liability
-* Indemnification
-* Confidentiality
-* Governing law
-
-The exact categories may evolve based on evaluation.
-
----
-
-## 14. Potential Risks
+## 13. Potential Risks
 
 The risk section presents issues that may deserve user attention.
 
@@ -385,7 +370,7 @@ Page 6 — Renewal
 
 ---
 
-## 15. Risk Severity
+## 14. Risk Severity
 
 The MVP may use a simple severity classification to help users scan results.
 
@@ -401,7 +386,7 @@ The underlying evidence should always be available.
 
 ---
 
-## 16. Missing Information
+## 15. Missing Information
 
 The missing-information section identifies potentially important information that does not appear to be present.
 
@@ -428,7 +413,7 @@ The UI should make clear that absence detection has uncertainty.
 
 ---
 
-## 17. Citation UX
+## 16. Citation UX
 
 Citations are a major trust feature.
 
@@ -452,7 +437,7 @@ Clicking the citation should take the user to the relevant document location whe
 
 ---
 
-## 18. Evidence Panel
+## 17. Evidence Panel
 
 When the user opens a citation, the interface can show the supporting evidence.
 
@@ -473,7 +458,7 @@ This allows users to verify AI-generated claims themselves.
 
 ---
 
-## 19. Document Viewer
+## 18. Document Viewer
 
 The document viewer should allow the user to read the original document.
 
@@ -488,7 +473,7 @@ The viewer should remain visually connected to the AI analysis.
 
 ---
 
-## 20. Conversational Q&A
+## 19. Conversational Q&A
 
 Conversational Q&A allows users to ask questions about the uploaded document.
 
@@ -514,7 +499,7 @@ The Q&A experience should feel conversational while remaining grounded in the do
 
 ---
 
-## 21. Follow-Up Questions
+## 20. Follow-Up Questions
 
 The system should support follow-up questions.
 
@@ -541,7 +526,7 @@ Conversation history can provide context, but the uploaded document remains the 
 
 ---
 
-## 22. Insufficient Information UX
+## 21. Insufficient Information UX
 
 If the document does not contain enough information, the product should say so clearly.
 
@@ -557,7 +542,7 @@ The product should not generate an answer simply to avoid saying that informatio
 
 ---
 
-## 23. AI Uncertainty UX
+## 22. AI Uncertainty UX
 
 Uncertainty should be communicated naturally.
 
@@ -575,7 +560,7 @@ The goal is to avoid false certainty.
 
 ---
 
-## 24. Legal Disclaimer
+## 23. Legal Disclaimer
 
 The product should display an appropriate disclaimer.
 
@@ -589,7 +574,7 @@ For high-risk situations, the product may provide a more prominent reminder to s
 
 ---
 
-## 25. Delete Document
+## 24. Delete Document
 
 Users should have a clear way to delete uploaded documents.
 
@@ -616,7 +601,7 @@ The product should clearly communicate the effect of deletion.
 
 ---
 
-## 26. Error States
+## 25. Error States
 
 The product should provide understandable error states.
 
@@ -644,7 +629,7 @@ Technical error details may be available for internal logging without exposing t
 
 ---
 
-## 27. Empty States
+## 26. Empty States
 
 Empty states should guide users toward the next action.
 
@@ -676,7 +661,7 @@ This communicates the limits of AI analysis.
 
 ---
 
-## 28. Navigation
+## 27. Navigation
 
 The primary navigation should remain simple.
 
@@ -702,7 +687,7 @@ Avoid creating unnecessary navigation levels.
 
 ---
 
-## 29. Responsive Design
+## 28. Responsive Design
 
 The product should support:
 
@@ -717,7 +702,7 @@ On mobile, complex side-by-side layouts may become vertically stacked.
 
 ---
 
-## 30. Accessibility
+## 29. Accessibility
 
 The MVP should follow basic accessibility principles.
 
@@ -736,7 +721,7 @@ Important states such as risk severity should not rely only on color.
 
 ---
 
-## 31. Trust Design Principles
+## 30. Trust Design Principles
 
 Trust is a primary product concern.
 
@@ -753,7 +738,7 @@ The UX should:
 
 ---
 
-## 32. UX for High-Risk Situations
+## 31. UX for High-Risk Situations
 
 When the system identifies potentially significant issues, the interface should not instruct the user to make a specific legal decision.
 
@@ -770,7 +755,7 @@ The product supports informed review rather than making the decision for the use
 
 ---
 
-## 33. UX Writing Principles
+## 32. UX Writing Principles
 
 All user-facing language should be:
 
@@ -807,7 +792,7 @@ unless the user explicitly asks about the technology.
 
 ---
 
-## 34. Example End-to-End Experience
+## 33. Example End-to-End Experience
 
 ### Step 1 — Landing Page
 
@@ -842,7 +827,7 @@ The system processes the document.
 The user sees:
 
 * Summary
-* Key terms
+* Key points
 * Potential risks
 * Missing information
 
@@ -882,7 +867,7 @@ The product does not make the decision for the user.
 
 ---
 
-## 35. MVP UX Scope
+## 34. MVP UX Scope
 
 ### Must Have
 
@@ -927,7 +912,7 @@ The product does not make the decision for the user.
 
 ---
 
-## 36. UX Metrics
+## 35. UX Metrics
 
 The UX should be evaluated using measurable product metrics.
 
@@ -965,7 +950,7 @@ Percentage of users who successfully complete the intended document-review workf
 
 ---
 
-## 37. UX Risks
+## 36. UX Risks
 
 ### Risk 1: Information Overload
 
@@ -1009,7 +994,7 @@ Keep the MVP navigation simple.
 
 ---
 
-## 38. UX Design Principles
+## 37. UX Design Principles
 
 ### 1. Understand First
 
@@ -1045,7 +1030,7 @@ Treat uploaded legal documents as sensitive throughout the experience.
 
 ---
 
-## 39. Final UX Summary
+## 38. Final UX Summary
 
 The MVP UX is centered around a simple workflow:
 

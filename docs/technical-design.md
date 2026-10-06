@@ -301,7 +301,6 @@ Authentication should support:
 * Login
 * Logout
 * Session management
-* Password recovery where applicable
 
 The authentication system should use established security practices rather than implementing password security from scratch.
 
@@ -819,15 +818,10 @@ The summary service analyzes the document and generates a structured summary.
 Potential output:
 
 ```text
-Document Type
-Key Parties
-Purpose
-Duration
-Payment Terms
-Termination
-Renewal
-Important Obligations
-Potential Areas Requiring Attention
+Summary
+Key Points
+Potential Risks
+Missing Information
 ```
 
 The summary should be generated using document context rather than unrestricted model knowledge.
@@ -1193,7 +1187,6 @@ Security requirements include:
 * Encryption in transit
 * Secret management
 * Input validation
-* Rate limiting
 * Secure API access
 * User-level data isolation
 
@@ -1330,27 +1323,7 @@ Production monitoring should track:
 
 ---
 
-## 51. Rate Limiting
-
-Rate limiting should protect the application from:
-
-* Abuse
-* Excessive API usage
-* Accidental request loops
-* Excessive AI costs
-
-Limits may be applied to:
-
-* Login attempts
-* Document uploads
-* AI requests
-* Chat requests
-
-Limits should be configurable.
-
----
-
-## 52. File Security
+## 51. File Security
 
 Uploaded files should be treated as untrusted input.
 
@@ -1367,7 +1340,7 @@ The application should never execute uploaded document content as code.
 
 ---
 
-## 53. Data Deletion
+## 52. Data Deletion
 
 When a user deletes a document, the system should remove or schedule deletion of:
 
@@ -1383,7 +1356,7 @@ Deletion behavior should follow the product's finalized retention policy.
 
 ---
 
-## 54. Testing Strategy
+## 53. Testing Strategy
 
 Testing should cover four major areas:
 
@@ -1398,7 +1371,7 @@ Each addresses different failure types.
 
 ---
 
-## 55. Unit Testing
+## 54. Unit Testing
 
 Unit tests should test individual components.
 
@@ -1425,7 +1398,7 @@ Correct chunk boundaries and metadata.
 
 ---
 
-## 56. Integration Testing
+## 55. Integration Testing
 
 Integration tests should verify interactions between components.
 
@@ -1451,7 +1424,7 @@ Integration testing should verify that data flows correctly across system bounda
 
 ---
 
-## 57. End-to-End Testing
+## 56. End-to-End Testing
 
 End-to-end tests should simulate real user workflows.
 
@@ -1487,7 +1460,7 @@ Receive Grounded Answer
 
 ---
 
-## 58. AI Evaluation Testing
+## 57. AI Evaluation Testing
 
 Traditional software tests cannot fully determine whether an AI response is good.
 
@@ -1505,7 +1478,7 @@ Evaluation datasets should contain representative legal-document examples.
 
 ---
 
-## 59. AI Regression Testing
+## 58. AI Regression Testing
 
 Whenever changes are made to:
 
@@ -1523,7 +1496,7 @@ This prevents an improvement in one area from silently degrading another.
 
 ---
 
-## 60. Performance Requirements
+## 59. Performance Requirements
 
 The application should measure:
 
@@ -1541,7 +1514,7 @@ The system should prioritize a responsive user experience without sacrificing AI
 
 ---
 
-## 61. Cost Management
+## 60. Cost Management
 
 AI costs can become significant.
 
@@ -1565,7 +1538,7 @@ Cost optimization strategies may include:
 
 ---
 
-## 62. Scalability Architecture
+## 61. Scalability Architecture
 
 The architecture should allow individual components to scale independently.
 
@@ -1590,7 +1563,7 @@ The database and storage layer should also support scaling as required.
 
 ---
 
-## 63. Deployment Architecture
+## 62. Deployment Architecture
 
 A production deployment may follow:
 
@@ -1619,7 +1592,7 @@ The exact cloud provider and deployment services will be selected based on cost,
 
 ---
 
-## 64. Development Workflow
+## 63. Development Workflow
 
 Development should follow:
 
@@ -1652,7 +1625,7 @@ Changes should be committed regularly using meaningful Git commit messages.
 
 ---
 
-## 65. Git Workflow
+## 64. Git Workflow
 
 The project repository should use Git for version control.
 
@@ -1679,7 +1652,7 @@ Add citation support
 
 ---
 
-## 66. CI/CD
+## 65. CI/CD
 
 The project should eventually use automated checks when code is pushed.
 
@@ -1708,7 +1681,7 @@ Deployment to production should only occur after required checks pass.
 
 ---
 
-## 67. Configuration Management
+## 66. Configuration Management
 
 Application configuration should be centralized.
 
@@ -1723,7 +1696,6 @@ Embedding model
 Retrieval parameters
 Maximum file size
 Allowed file types
-Rate limits
 Environment
 ```
 
@@ -1731,7 +1703,7 @@ Configuration values should not be scattered throughout application code.
 
 ---
 
-## 68. Dependency Management
+## 67. Dependency Management
 
 Dependencies should be explicitly defined and version controlled.
 
@@ -1743,7 +1715,7 @@ Dependencies should be updated carefully and tested before deployment.
 
 ---
 
-## 69. Technical Risks
+## 68. Technical Risks
 
 ### Risk 1: Poor PDF Extraction
 
@@ -1793,9 +1765,17 @@ Large documents may take significant time.
 
 Use asynchronous background processing and clear status communication.
 
+### Risk 7: Server Cold Starts
+
+The production API runs on Render's free plan, which sleeps after about 15 minutes without traffic. The first request after a quiet period can take more than a minute while the instance wakes, so sign-up, login, and upload appear to hang.
+
+**Mitigation:**
+
+Move the production API to an always-on paid instance (the staging setup already uses an always-on Starter instance), or show a clear "service is starting" message while the API wakes.
+
 ---
 
-## 70. Technical Decisions
+## 69. Technical Decisions
 
 The MVP makes the following high-level decisions:
 
@@ -1819,7 +1799,7 @@ These decisions may be changed if implementation or evaluation provides a strong
 
 ---
 
-## 71. MVP Technical Scope
+## 70. MVP Technical Scope
 
 ### Must Have
 
@@ -1867,7 +1847,7 @@ These decisions may be changed if implementation or evaluation provides a strong
 
 ---
 
-## 72. Implementation Order
+## 71. Implementation Order
 
 The implementation should proceed in the following order:
 
@@ -1943,7 +1923,7 @@ The implementation should proceed in the following order:
 
 ---
 
-## 73. Definition of Technical Completion
+## 72. Definition of Technical Completion
 
 The MVP technical implementation is considered complete when:
 
@@ -1969,7 +1949,7 @@ The MVP technical implementation is considered complete when:
 
 ---
 
-## 74. Future Technical Improvements
+## 73. Future Technical Improvements
 
 Potential improvements include:
 
@@ -1993,7 +1973,7 @@ These improvements are outside the initial MVP unless evaluation or product requ
 
 ---
 
-## 75. Final Technical Architecture Summary
+## 74. Final Technical Architecture Summary
 
 The technical architecture connects the product, UX, and AI architecture into one system.
 

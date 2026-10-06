@@ -1,6 +1,6 @@
 # Post-MVP Production Plan
 
-This plan describes the work required before the AI Legal Document Reviewer can serve production users. The current MVP runs locally with FastAPI, Next.js, PostgreSQL/pgvector, local Ollama inference, and local file storage. The local Playwright suite now covers registration through document deletion, upload validation, access isolation, grounded chat, citations, and scanned-PDF OCR.
+This plan tracks production hardening for the AI Legal Document Reviewer, which is live at https://lawyerlens.in. The local Playwright suite now covers registration through document deletion, upload validation, access isolation, grounded chat, citations, and scanned-PDF OCR.
 
 ## 1. Production-Readiness Gaps
 
@@ -8,8 +8,9 @@ This plan describes the work required before the AI Legal Document Reviewer can 
 - Uploaded PDFs are stored on the backend's local filesystem. There is no production object-storage adapter or retention policy.
 - The backend has no migration framework or established upgrade/rollback process.
 - The staging branch now has a durable document-processing queue, bounded retries, stale-job recovery, and user-visible processing states. Production still requires the migration and worker service to be promoted together.
-- Email verification and expiring password-reset flows are implemented. Password reset is disabled by default until SMTP delivery is verified; enable it explicitly on both the backend and frontend when ready. Refresh/revocation, MFA, and account-deletion flows are absent; the browser stores access tokens in local storage.
-- Browser retries, request IDs, optional Sentry reporting, and scheduled health checks are implemented on the staging branch. Rate limits, production TLS, centralized dashboards, and alert routing still need provider configuration.
+- Email verification is implemented. Password reset is out of scope and stays disabled on both the backend and frontend. Refresh/revocation, MFA, and account-deletion flows are absent; the browser stores access tokens in local storage.
+- Browser retries, request IDs, optional Sentry reporting, and scheduled health checks are implemented on the staging branch. Production TLS, centralized dashboards, and alert routing still need provider configuration.
+- The production API runs on Render's free plan, which sleeps after about 15 minutes without traffic. The first request after a quiet period can take more than a minute, so sign-up, login, and upload appear to hang. Staging already uses an always-on Starter instance; production needs the same before it can meet the PRD's processing-feedback requirement.
 - Production capacity, AI quality thresholds, privacy terms, and service objectives have not been approved.
 
 ## 2. Security Hardening
@@ -45,8 +46,8 @@ Introduce validated environment configuration before deployment. At minimum, sup
 | `EMAIL_PROVIDER`, `BREVO_API_KEY`, `BREVO_FROM_EMAIL`, `BREVO_FROM_NAME` | Production Brevo HTTPS email configuration |
 | `APP_BASE_URL` | Base URL used in verification and password-reset links |
 | `EMAIL_VERIFICATION_ENABLED` | Keep `true` outside local development; local development can set `false` until SMTP is configured |
-| `PASSWORD_RESET_ENABLED` | Backend feature flag; keep `false` until reset email delivery is verified |
-| `NEXT_PUBLIC_PASSWORD_RESET_ENABLED` | Frontend feature flag; set to `true` with the backend flag when password reset is enabled |
+| `PASSWORD_RESET_ENABLED` | Backend feature flag; keep `false` (password reset is out of scope) |
+| `NEXT_PUBLIC_PASSWORD_RESET_ENABLED` | Frontend feature flag; keep `false` (password reset is out of scope) |
 | `DOCUMENT_STORAGE` settings | Private object-storage bucket, region, and credentials or workload identity |
 | `MAX_UPLOAD_BYTES` | Server-side upload limit |
 | `ENVIRONMENT`, `LOG_LEVEL` | Runtime mode and log verbosity |
@@ -95,38 +96,32 @@ Do not commit production values, certificates, passwords, or signing keys. Valid
 ## 10. Authentication Hardening
 
 - Move session credentials out of local storage and use secure, HttpOnly, SameSite cookies or an equivalently reviewed design.
-- Keep email verification and password-reset tokens single-use, hashed at rest, and expiry-limited; configure a verified sender, rate-limit requests, and test delivery failures.
+- Keep email verification tokens single-use, hashed at rest, and expiry-limited; configure a verified sender and test delivery failures.
 - Add session revocation, password-change handling, and a documented password policy.
-- Consider MFA for privileged or business accounts. Rate-limit registration and login, protect against credential stuffing, and monitor suspicious authentication activity.
+- Consider MFA for privileged or business accounts and monitor suspicious authentication activity.
 - Test expired, revoked, malformed, and cross-user credentials in CI and staging.
 
-## 11. Rate Limiting
-
-- Apply per-IP and per-account limits to registration, login, uploads, analysis, chat, and deletion.
-- Add request-size, page-count, extracted-text, concurrency, and model-token limits.
-- Use a shared rate-limit store for multi-instance deployments, return actionable `429` responses, and alert on abuse patterns.
-
-## 12. Logging and Monitoring
+## 11. Logging and Monitoring
 
 - Emit structured logs with request IDs, operation status, latency, model identifier, and non-sensitive document IDs.
 - Never log access tokens, passwords, full prompts, extracted text, model responses containing document data, or signed URLs.
 - Monitor API availability, queue depth, upload and OCR failures, model latency/timeouts, database health, storage failures, and resource utilization.
 - Define service objectives and on-call alerts before opening the service to users.
 
-## 13. Error Tracking
+## 12. Error Tracking
 
 - Select an error-tracking service and configure source maps for the frontend and release identifiers for both applications.
 - Scrub user data, document contents, credentials, and request bodies before sending error events.
 - Group errors by route and failure type; define ownership and response targets for authentication, upload, processing, AI, and storage failures.
 
-## 14. CI/CD
+## 13. CI/CD
 
 - Run lint, TypeScript, backend import/compile checks, dependency checks, and automated tests on every pull request.
 - Build immutable frontend/backend artifacts, scan dependencies and images, and retain test and build provenance.
 - Deploy first to staging. Require explicit review before production promotion; keep rollback artifacts and a documented rollback decision path.
 - Run database migrations as an explicit release step and verify health/readiness before shifting traffic.
 
-## 15. Automated Testing in CI
+## 14. Automated Testing in CI
 
 - Keep the Playwright suite against an isolated frontend and backend. It covers registration, verification gating, the password-reset-disabled state, valid upload, PDF viewing, analysis sections, typo-tolerant and multi-part document Q&A, source evidence, chat persistence/clear, deletion, invalid/oversized uploads, unauthenticated access, cross-user denial, and OCR. Email tests use a local SMTP capture server and never send to real addresses.
 - Run the E2E suite with an isolated disposable PostgreSQL/pgvector database, local Ollama model, synthetic PDFs, and a dedicated test secret. Never use user documents or production credentials as fixtures.
@@ -134,14 +129,14 @@ Do not commit production values, certificates, passwords, or signing keys. Valid
 - Keep OCR fixtures image-only and verify extracted text and page metadata. Keep the CI job time-bounded and store reports/traces only for a short retention period.
 - Track model evaluation on a versioned synthetic and approved benchmark set; require reviewed quality thresholds before changing models or prompts.
 
-## 16. Backup and Recovery
+## 15. Backup and Recovery
 
 - Enable managed PostgreSQL point-in-time recovery and encrypted backups with documented retention.
 - Enable object versioning or an equivalent recovery mechanism consistent with user deletion requirements.
 - Define recovery point and recovery time objectives, assign owners, and run scheduled restore drills into an isolated environment.
 - Verify that a restored database and object store preserve ownership checks, citations, and deletion state.
 
-## 17. Privacy and Data Deletion
+## 16. Privacy and Data Deletion
 
 - Publish a clear privacy notice covering uploaded files, extracted text, embeddings, chat history, model processing, retention, and subprocessors.
 - Define retention periods and defaults. Do not use documents for model training.
@@ -149,14 +144,15 @@ Do not commit production values, certificates, passwords, or signing keys. Valid
 - Record deletion completion without retaining deleted content. Provide a user-visible deletion confirmation and test end-to-end deletion.
 - Complete a privacy impact review for the target markets and legal obligations before launch.
 
-## 18. Cost Considerations
+## 17. Cost Considerations
 
 - Measure CPU/GPU inference, embedding generation, OCR, storage, database, network, backup, and observability costs with realistic workloads.
 - Estimate peak concurrency and per-document processing cost; set budgets and alerts for model hosting and storage growth.
 - Compare private GPU hosting with CPU-only inference using latency, accuracy, availability, and privacy requirements. Keep inference local/self-hosted unless a different provider is explicitly approved.
 - Use lifecycle rules and published retention limits to control storage and backup costs.
+- Budget for an always-on API instance. Render's free plan avoids hosting cost but sleeps when idle, causing cold starts of more than a minute; the paid Starter plan stays awake.
 
-## 19. Exact Deployment Sequence
+## 18. Exact Deployment Sequence
 
 1. Approve target markets, data residency, privacy terms, service objectives, and production model versions.
 2. Provision staging and production accounts, private network boundaries, DNS, TLS, secret management, and monitoring.
@@ -173,14 +169,14 @@ Do not commit production values, certificates, passwords, or signing keys. Valid
 13. Deploy the matching frontend artifact, perform a synthetic production smoke journey, and monitor errors and latency.
 14. Keep rollback artifacts and the release owner available through the observation window; roll back on the defined triggers.
 
-## 20. Final Production Checklist
+## 19. Final Production Checklist
 
 - [ ] Security review and privacy review are approved.
 - [ ] Production secrets and database roles are managed outside source control.
 - [ ] HTTPS, cookies, CORS, CSP, and security headers are verified.
 - [ ] Database migrations, backups, and a restore drill are verified.
 - [ ] Private file storage, retention, and complete deletion are verified.
-- [ ] Authentication recovery, expiry, revocation, and rate limits are verified.
+- [ ] Authentication token expiry and revocation are verified.
 - [ ] Ollama and embedding models are pinned, evaluated, monitored, and capacity-tested.
 - [ ] Background processing, retry behavior, and user-visible failure states are ready.
 - [ ] CI passes frontend checks, backend checks, integration tests, and app E2E tests.
@@ -190,4 +186,4 @@ Do not commit production values, certificates, passwords, or signing keys. Valid
 
 ## Production-Readiness Status
 
-The MVP is verified locally by the Playwright user journey (8 browser tests pass), and the staging reliability implementation is on the isolated `codex/staging-reliability` branch. It is **not production-ready for this branch** until the separate Neon, Render, Vercel, R2, Brevo, and monitoring settings are configured and the staging gates pass. A verified Brevo sender and authenticated domain are still required for reliable email delivery; keep password reset disabled until that is confirmed. Do not promote this branch to production until the staging migration, queue worker, E2E run, health monitor, and manual smoke test all pass.
+The product is live in production at https://lawyerlens.in, with the frontend on Vercel and the API on Render. The MVP is verified by the Playwright user journey (8 browser tests pass). Reliability improvements are developed on the `codex/staging-reliability` branch and tested on staging before they are promoted; see [STAGING-ENVIRONMENT.md](STAGING-ENVIRONMENT.md).
