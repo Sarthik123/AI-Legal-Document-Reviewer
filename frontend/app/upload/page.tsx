@@ -7,6 +7,46 @@ import { apiErrorMessage, API_URL, readApiPayload } from "../api";
 import { trackUploadFailed, trackUploadStarted } from "../lib/analytics";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const UPLOAD_TIMEOUT_MS = 180_000;
+const RETRY_DELAYS_MS = [2_000, 5_000];
+const FILE_READ_ERROR =
+  "Couldn't open this file. Save it to your phone first, then upload.";
+
+function isNetworkError(error: unknown): boolean {
+  return (
+    error instanceof TypeError ||
+    (error instanceof Error &&
+      /load failed|failed to fetch|networkerror/i.test(error.message))
+  );
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postWithRetry(url: string, token: string, body: FormData) {
+  for (let attempt = 0; ; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      // Timeouts are not retried: the server may still be processing the file.
+      if (!isNetworkError(error) || attempt >= RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+      await wait(RETRY_DELAYS_MS[attempt]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+}
 
 export default function UploadPage() {
   const router = useRouter();
@@ -33,7 +73,12 @@ export default function UploadPage() {
       return;
     }
 
-    if (file.type !== "application/pdf") {
+    // Android file providers (Drive, WhatsApp) sometimes report an empty type.
+    const isPdf =
+      file.type === "application/pdf" ||
+      (!file.type && /\.pdf$/i.test(file.name));
+
+    if (!isPdf) {
       setSelectedFile(null);
       setSuccessMessage("");
       setMessage("Please select a PDF document.");
@@ -86,28 +131,35 @@ export default function UploadPage() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-
     setUploading(true);
     setMessage("");
     setSuccessMessage("");
     trackUploadStarted();
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+    // Copy the bytes into memory first. Android Chrome can lose access to
+    // files picked from Drive/WhatsApp, which makes fetch fail before any
+    // request is sent.
+    let uploadFile: File;
+    try {
+      const bytes = await selectedFile.arrayBuffer();
+      uploadFile = new File([bytes], selectedFile.name, {
+        type: "application/pdf",
+      });
+    } catch (error) {
+      trackUploadFailed(error, selectedFile);
+      setMessage(FILE_READ_ERROR);
+      setUploading(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", uploadFile);
 
     try {
-      const response = await fetch(
+      const response = await postWithRetry(
         `${API_URL}/documents`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-          signal: controller.signal,
-        }
+        token,
+        formData,
       );
 
       const data = await readApiPayload(response);
@@ -131,10 +183,9 @@ export default function UploadPage() {
       setDocumentId(data.document_id);
       setSuccessMessage("Uploaded successfully.");
     } catch (error) {
-      trackUploadFailed(error);
+      trackUploadFailed(error, uploadFile);
       setMessage(apiErrorMessage(error, "Something went wrong during upload."));
     } finally {
-      clearTimeout(timeoutId);
       setUploading(false);
     }
   }

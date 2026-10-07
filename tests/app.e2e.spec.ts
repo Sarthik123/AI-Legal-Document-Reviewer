@@ -318,7 +318,9 @@ test('network failures show an actionable error', async ({ page }) => {
   await page.locator('input[type="email"]').fill('unknown-user@example.com');
   await page.locator('input[type="password"]').fill('wrong-password');
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
-  await expect(page.getByText('Unable to reach the server. Please try again.')).toBeVisible();
+  await expect(
+    page.getByText('Could not reach the server. Check your connection or try on Wi-Fi.'),
+  ).toBeVisible();
 });
 
 test('unauthenticated routes and document APIs are protected', async ({ page, request }) => {

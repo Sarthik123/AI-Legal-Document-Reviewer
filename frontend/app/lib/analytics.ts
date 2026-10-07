@@ -77,8 +77,36 @@ function classifyUploadError(error: unknown): UploadErrorType {
   return "server_error";
 }
 
-export function trackUploadFailed(error: unknown): void {
-  posthog.capture("upload_failed", { error_type: classifyUploadError(error) });
+function fileSizeBucket(size: number | undefined): string {
+  if (size === undefined) return "unknown";
+  const mb = size / (1024 * 1024);
+  if (mb < 1) return "<1MB";
+  if (mb < 5) return "1-5MB";
+  if (mb <= 10) return "5-10MB";
+  return ">10MB";
+}
+
+// Never let a file name or path reach analytics, even if a browser puts one
+// in an error message.
+function safeErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/[^\s"'/\\]+\.(pdf|docx?|png|jpe?g)\b/gi, "[file]")
+    .replace(/(?:[a-z]+:\/\/|\/)[^\s"']+/gi, "[path]")
+    .slice(0, 160);
+}
+
+export function trackUploadFailed(
+  error: unknown,
+  file?: { size: number; type: string },
+): void {
+  posthog.capture("upload_failed", {
+    error_type: classifyUploadError(error),
+    error_name: error instanceof Error ? error.name : typeof error,
+    error_message: safeErrorMessage(error),
+    file_size_bucket: fileSizeBucket(file?.size),
+    mime_type: file?.type || "unknown",
+  });
 }
 
 export function trackAnalysisCompleted(durationMs: number): void {
