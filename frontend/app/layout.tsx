@@ -43,6 +43,15 @@ export default function RootLayout({ children }: LayoutProps) {
             <a href="/privacy" className="underline hover:text-gray-500">
               Privacy
             </a>
+            {" · "}
+            <a
+              href="https://forms.gle/1vYLhWUrbvcZm3vw9"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gray-500"
+            >
+              Give feedback
+            </a>
           </footer>
         </PostHogProvider>
       </body>

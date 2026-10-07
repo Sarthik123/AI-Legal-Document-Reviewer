@@ -822,6 +822,17 @@ export default function DocumentPage() {
               </button>
             </div>
           </form>
+
+          <div className="border-t border-gray-200 px-5 py-3 text-center">
+            <a
+              href="https://forms.gle/1vYLhWUrbvcZm3vw9"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-500 underline hover:text-black"
+            >
+              Give feedback
+            </a>
+          </div>
         </div>
       </div>
     </main>
