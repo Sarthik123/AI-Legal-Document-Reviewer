@@ -4,7 +4,7 @@ import unittest
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-from app.services.ai_provider import call_model
+from app.services.ai_provider import call_model, ai_observability_context
 from app.services.analysis_service import (
     AnalysisGenerationError,
     _call_analysis_model,
@@ -78,6 +78,113 @@ class CloudflareStructuredOutputTests(unittest.TestCase):
         with self.assertRaises(AnalysisGenerationError):
             _call_analysis_model("Analyze this document.")
         self.assertEqual(call_model_mock.call_count, 2)
+
+
+class PostHogPrivacyTests(unittest.TestCase):
+    """Verify that document text and AI answers never reach PostHog."""
+
+    _BANNED_KEYS = {"$ai_input", "$ai_output", "$ai_output_choices"}
+
+    def _make_posthog_client(self):
+        client = MagicMock()
+        captured_calls = []
+
+        def capture(event, *, distinct_id, properties):
+            captured_calls.append(properties)
+
+        client.capture.side_effect = capture
+        return client, captured_calls
+
+    @patch.dict(os.environ, {
+        "AI_PROVIDER": "ollama",
+        "OLLAMA_URL": "http://127.0.0.1:11434/api/chat",
+        "OLLAMA_MODEL": "qwen2.5:3b",
+    })
+    @patch("app.services.ai_provider.urllib.request.urlopen")
+    @patch("app.services.ai_provider.posthog_integration")
+    def test_posthog_never_receives_ai_input_or_output_on_success(
+        self, posthog_mod, urlopen
+    ):
+        client, calls = self._make_posthog_client()
+        posthog_mod.posthog_client = client
+
+        response = MagicMock()
+        response.__enter__.return_value = BytesIO(json.dumps({
+            "message": {"content": json.dumps({"summary": "test"})},
+        }).encode())
+        urlopen.return_value = response
+
+        with ai_observability_context("sess-1", "user-1"):
+            call_model([{"role": "user", "content": "Sensitive question about my contract."}], 100)
+
+        self.assertTrue(calls, "Expected at least one PostHog capture call.")
+        for props in calls:
+            for banned in self._BANNED_KEYS:
+                self.assertNotIn(
+                    banned,
+                    props,
+                    f"PostHog received banned key '{banned}' — document text or AI output leaked.",
+                )
+
+    @patch.dict(os.environ, {
+        "AI_PROVIDER": "ollama",
+        "OLLAMA_URL": "http://127.0.0.1:11434/api/chat",
+        "OLLAMA_MODEL": "qwen2.5:3b",
+    })
+    @patch("app.services.ai_provider.urllib.request.urlopen")
+    @patch("app.services.ai_provider.posthog_integration")
+    def test_posthog_never_receives_ai_input_or_output_on_error(
+        self, posthog_mod, urlopen
+    ):
+        client, calls = self._make_posthog_client()
+        posthog_mod.posthog_client = client
+
+        urlopen.side_effect = OSError("connection refused")
+
+        with self.assertRaises(OSError):
+            with ai_observability_context("sess-2", "user-2"):
+                call_model([{"role": "user", "content": "My lease agreement text here."}], 100)
+
+        self.assertTrue(calls, "Expected at least one PostHog capture call on error.")
+        for props in calls:
+            for banned in self._BANNED_KEYS:
+                self.assertNotIn(
+                    banned,
+                    props,
+                    f"PostHog received banned key '{banned}' on error path.",
+                )
+
+    @patch.dict(os.environ, {
+        "AI_PROVIDER": "cloudflare_workers_ai",
+        "CLOUDFLARE_ACCOUNT_ID": "acct",
+        "CLOUDFLARE_API_TOKEN": "tok",
+    })
+    @patch("app.services.ai_provider.urllib.request.urlopen")
+    @patch("app.services.ai_provider.posthog_integration")
+    def test_posthog_never_receives_ai_input_or_output_cloudflare(
+        self, posthog_mod, urlopen
+    ):
+        client, calls = self._make_posthog_client()
+        posthog_mod.posthog_client = client
+
+        response = MagicMock()
+        response.__enter__.return_value = BytesIO(json.dumps({
+            "success": True,
+            "result": {"response": "Answer grounded in document."},
+        }).encode())
+        urlopen.return_value = response
+
+        with ai_observability_context("sess-3", "user-3"):
+            call_model([{"role": "user", "content": "What does clause 5 say?"}], 200)
+
+        self.assertTrue(calls, "Expected at least one PostHog capture call.")
+        for props in calls:
+            for banned in self._BANNED_KEYS:
+                self.assertNotIn(
+                    banned,
+                    props,
+                    f"PostHog received banned key '{banned}' via Cloudflare path.",
+                )
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearAccessToken } from "../auth";
 import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { trackUploadFailed, trackUploadStarted } from "../lib/analytics";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -91,6 +92,7 @@ export default function UploadPage() {
     setUploading(true);
     setMessage("");
     setSuccessMessage("");
+    trackUploadStarted();
 
     try {
       const response = await fetch(
@@ -125,6 +127,7 @@ export default function UploadPage() {
       setDocumentId(data.document_id);
       setSuccessMessage("Uploaded successfully.");
     } catch (error) {
+      trackUploadFailed(error);
       setMessage(apiErrorMessage(error, "Something went wrong during upload."));
     } finally {
       setUploading(false);

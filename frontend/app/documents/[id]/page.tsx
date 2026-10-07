@@ -8,6 +8,11 @@ import {
   API_URL,
   readApiPayload,
 } from "../../api";
+import {
+  trackAnalysisCompleted,
+  trackQuestionAsked,
+  trackResultsViewed,
+} from "../../lib/analytics";
 
 type DocumentData = {
   document_id: string;
@@ -72,6 +77,7 @@ export default function DocumentPage() {
 
   const chatContainerRef =
     useRef<HTMLDivElement | null>(null);
+  const analysisStartedAt = useRef<number | null>(null);
 
   useEffect(() => {
     async function runAnalysis() {
@@ -83,6 +89,7 @@ export default function DocumentPage() {
 
       setAnalysisLoading(true);
       setAnalysisError("");
+      analysisStartedAt.current = Date.now();
 
       try {
         const response = await fetch(
@@ -105,6 +112,12 @@ export default function DocumentPage() {
           );
         }
 
+        const durationMs =
+          analysisStartedAt.current !== null
+            ? Date.now() - analysisStartedAt.current
+            : 0;
+        trackAnalysisCompleted(durationMs);
+        trackResultsViewed();
         setAnalysis(data as unknown as DocumentAnalysis);
       } catch (error) {
         setAnalysisError(apiErrorMessage(error, "Failed to analyze document."));
@@ -296,6 +309,7 @@ export default function DocumentPage() {
     setChatInput("");
     setChatError("");
     setChatSending(true);
+    trackQuestionAsked();
 
     try {
       const response = await fetch(

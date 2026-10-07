@@ -9,6 +9,7 @@ import {
   getServerSnapshot,
   subscribeToAuthState,
 } from "../auth";
+import { resetIdentity } from "../lib/analytics";
 
 export default function AuthNav() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function AuthNav() {
   }
 
   function handleLogout() {
+    resetIdentity();
     clearAccessToken();
     router.push("/login");
   }

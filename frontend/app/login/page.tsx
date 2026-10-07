@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { storeAccessToken } from "../auth";
 import { apiErrorMessage, API_URL, readApiPayload } from "../api";
+import { identifyUser, trackLoggedIn } from "../lib/analytics";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,6 +51,8 @@ export default function LoginPage() {
       }
 
       storeAccessToken(data.access_token);
+      identifyUser();
+      trackLoggedIn();
 
       router.push("/upload");
     } catch (error) {

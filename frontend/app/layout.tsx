@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import AuthNav from "./components/AuthNav";
+import PostHogProvider from "./components/PostHogProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,16 +30,18 @@ export default function RootLayout({ children }: LayoutProps) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-screen flex-col">
-        <AuthNav />
+        <PostHogProvider>
+          <AuthNav />
 
-        <div className="flex-1">
-          {children}
-        </div>
+          <div className="flex-1">
+            {children}
+          </div>
 
-        <footer className="app-footer">
-          This tool provides AI-assisted document analysis and is not a
-          substitute for professional legal advice.
-        </footer>
+          <footer className="app-footer">
+            This tool provides AI-assisted document analysis and is not a
+            substitute for professional legal advice.
+          </footer>
+        </PostHogProvider>
       </body>
     </html>
   );
