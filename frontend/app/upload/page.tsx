@@ -203,6 +203,10 @@ export default function UploadPage() {
           <p className="mt-4 text-sm text-gray-500">
             PDF only · Maximum file size: 10 MB · No fixed page or character limit
           </p>
+
+          <p className="mt-3 text-sm text-gray-500">
+            Your documents are private to you. Delete them anytime.
+          </p>
         </div>
 
         {(successMessage || documentId) && (

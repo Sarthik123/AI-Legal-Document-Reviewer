@@ -30,8 +30,10 @@ export default function Home() {
         </div>
 
         <p className="mt-8 max-w-xl text-sm text-gray-500">
-          AI assistance for document understanding. This tool does not provide
-          legal advice or replace a qualified legal professional.
+          Your documents are private to you. Delete them anytime.{" "}
+          <a href="/privacy" className="underline hover:text-gray-700">
+            Read our privacy policy.
+          </a>
         </p>
       </section>
     </main>

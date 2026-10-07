@@ -39,7 +39,10 @@ export default function RootLayout({ children }: LayoutProps) {
 
           <footer className="app-footer">
             This tool provides AI-assisted document analysis and is not a
-            substitute for professional legal advice.
+            substitute for professional legal advice.{" "}
+            <a href="/privacy" className="underline hover:text-gray-500">
+              Privacy
+            </a>
           </footer>
         </PostHogProvider>
       </body>
