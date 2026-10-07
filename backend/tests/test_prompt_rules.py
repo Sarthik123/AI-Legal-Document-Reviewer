@@ -182,6 +182,43 @@ class ExtractivePathRulesTests(unittest.TestCase):
                 f"Answer must end a sentence, got: {answer!r}",
             )
 
+    def test_extractive_returns_none_for_real_cut_off_lines(self):
+        """The two real cut-off answers from the eval must not be quoted."""
+        from app.services.qa_service import _extractive_grounded_answer
+
+        for question, content in [
+            (
+                "What interest is charged on late rent?",
+                "Interest on late rent shall be charged thereon in\n"
+                "accordance with the schedule.",
+            ),
+            (
+                "How does the tenancy terminate?",
+                "The tenancy shall terminate on the delivery of written\n"
+                "notice by either party.",
+            ),
+        ]:
+            with self.subTest(question=question):
+                self.assertIsNone(
+                    _extractive_grounded_answer(question, [self._chunk(content)])
+                )
+
+    def test_extractive_keeps_ocr_line_with_garbled_final_period(self):
+        """OCR often reads a final period as '_'; the value must still be answered."""
+        from app.services.qa_service import _extractive_grounded_answer
+
+        chunk = self._chunk(
+            "OCR SERVICE AGREEMENT\n"
+            "Customer: Meadow Test Company.\n"
+            "OCR verification token: PINEAPPLE-7391-OTTER_\n"
+            "Monthly amount: $1,275."
+        )
+        result = _extractive_grounded_answer(
+            "What is the OCR verification token?", [chunk]
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("PINEAPPLE-7391-OTTER", result[0])
+
     # --- Real-world placeholder examples ---
 
     def test_extractive_returns_none_for_complete_address_placeholder(self):

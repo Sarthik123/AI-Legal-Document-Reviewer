@@ -29,8 +29,10 @@ _PLACEHOLDER_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Characters that reliably end a complete clause in legal text.
-_SENTENCE_END_RE = re.compile(r'[.?!;][\'""”]?$')
+# A PDF line that stops on a lowercase word, comma, or hyphen is cut off
+# mid-clause ("...charged thereon in"). Lines ending in digits, capitals, or
+# OCR-garbled punctuation ("PINEAPPLE-7391-OTTER_") are kept.
+_FRAGMENT_END_RE = re.compile(r"[a-z,\-]$")
 
 _QA_RESPONSE_SCHEMA = {
     "type": "json_schema",
@@ -655,7 +657,7 @@ def _extractive_grounded_answer(
             return None
         if _PLACEHOLDER_RE.search(line):
             return None
-        if not _SENTENCE_END_RE.search(line):
+        if _FRAGMENT_END_RE.search(line):
             return None
 
         answer_lines.append(line)
