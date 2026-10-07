@@ -52,6 +52,19 @@ type DocumentAnalysis = {
   }[];
 };
 
+// A plain link so leaving the page never depends on client-side routing,
+// even while slow document, PDF, or analysis requests are still pending.
+function BackToDashboard() {
+  return (
+    <a
+      href="/dashboard"
+      className="mb-6 text-sm text-gray-600 hover:text-black"
+    >
+      ← Back to Dashboard
+    </a>
+  );
+}
+
 export default function DocumentPage() {
   const params = useParams();
   const router = useRouter();
@@ -424,6 +437,7 @@ export default function DocumentPage() {
     return (
       <main className="app-page document-page">
         <div className="mx-auto max-w-6xl">
+          <BackToDashboard />
           <p className="document-loading">Loading document...</p>
         </div>
       </main>
@@ -434,6 +448,7 @@ export default function DocumentPage() {
     return (
       <main className="app-page document-page">
         <div className="mx-auto max-w-6xl">
+          <BackToDashboard />
           <p className="document-load-error text-red-600">
             {message || "Document not found."}
           </p>
@@ -445,15 +460,7 @@ export default function DocumentPage() {
   return (
     <main className="app-page document-page">
       <div className="mx-auto max-w-7xl">
-        <button
-          type="button"
-          onClick={() =>
-            router.push("/dashboard")
-          }
-          className="mb-6 text-sm text-gray-600 hover:text-black"
-        >
-          ← Back to Dashboard
-        </button>
+        <BackToDashboard />
 
         <h1 className="text-3xl font-bold">
           {document.filename}

@@ -290,7 +290,7 @@ test('registration, review, grounded chat, persistence, clear, and delete', asyn
   });
   expect((await emptyHistory.json()).messages).toEqual([]);
 
-  await page.getByRole('button', { name: 'Back to Dashboard' }).click();
+  await page.getByRole('link', { name: 'Back to Dashboard' }).click();
   await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete' }).click();

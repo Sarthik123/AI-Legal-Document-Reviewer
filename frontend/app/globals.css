@@ -592,7 +592,7 @@ summary {
   margin-inline: auto;
 }
 
-.document-page > div > button:first-child {
+.document-page > div > a:first-child {
   display: inline-flex;
   min-height: 2.4rem;
   align-items: center;
@@ -605,7 +605,7 @@ summary {
   transition: border-color 150ms ease, color 150ms ease;
 }
 
-.document-page > div > button:first-child:hover {
+.document-page > div > a:first-child:hover {
   border-color: #c8cfee;
   color: var(--accent-strong);
 }
