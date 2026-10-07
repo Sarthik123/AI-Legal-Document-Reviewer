@@ -78,6 +78,8 @@ export default function DocumentPage() {
   const chatContainerRef =
     useRef<HTMLDivElement | null>(null);
   const analysisStartedAt = useRef<number | null>(null);
+  const processingWhenOpened = useRef(false);
+  const hasTrackedResultsViewed = useRef(false);
 
   useEffect(() => {
     async function runAnalysis() {
@@ -116,8 +118,13 @@ export default function DocumentPage() {
           analysisStartedAt.current !== null
             ? Date.now() - analysisStartedAt.current
             : 0;
-        trackAnalysisCompleted(durationMs);
-        trackResultsViewed();
+        if (processingWhenOpened.current) {
+          trackAnalysisCompleted(durationMs);
+        }
+        if (!hasTrackedResultsViewed.current) {
+          hasTrackedResultsViewed.current = true;
+          trackResultsViewed();
+        }
         setAnalysis(data as unknown as DocumentAnalysis);
       } catch (error) {
         setAnalysisError(apiErrorMessage(error, "Failed to analyze document."));
@@ -167,7 +174,11 @@ export default function DocumentPage() {
           );
         }
 
-        setDocument(documentData as unknown as DocumentData);
+        const docData = documentData as unknown as DocumentData;
+        if (docData.processing_status !== "processed") {
+          processingWhenOpened.current = true;
+        }
+        setDocument(docData);
 
         const pdfResponse = await fetch(
         `${API_URL}/documents/${documentId}/file`,
