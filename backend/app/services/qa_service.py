@@ -15,6 +15,23 @@ ABSTENTION_MESSAGE = (
     "The document does not provide enough information to answer this question."
 )
 
+# Matches unfilled blanks and placeholder labels such as "____", "[ ]", "[__]",
+# "(Name of the Owner)", "(Complete Address ofthe Rented Property)", "(city)",
+# "s/o", "d/o" so the extractive path can route them to the LLM.
+_PLACEHOLDER_RE = re.compile(
+    r"_{2,}"
+    r"|\[\s*\]"
+    r"|\[\s*_{1,}\s*\]"
+    r"|\(\s*(?:name|party|owner|tenant|lessee|lessor|buyer|seller|vendor|"
+    r"purchaser|insert|fill|enter|address|complete|date|amount|city|rs|father)"
+    r"\b[^)]{0,80}\)"
+    r"|\(\s*(?:s/o|d/o|w/o)[^)]{0,60}\)",
+    re.IGNORECASE,
+)
+
+# Characters that reliably end a complete clause in legal text.
+_SENTENCE_END_RE = re.compile(r'[.?!;][\'""”]?$')
+
 _QA_RESPONSE_SCHEMA = {
     "type": "json_schema",
     "json_schema": {
@@ -630,8 +647,16 @@ def _extractive_grounded_answer(
     cited_evidence = set()
 
     for _, _, _, chunk, line, _ in selected:
+        # Route to the LLM path for sentences that can't be quoted in full:
+        # too long (truncation cuts mid-sentence), contains an unfilled blank
+        # or placeholder (Rule 13), or is a PDF line fragment that doesn't
+        # end a clause (PDF line-splits produce "...charged thereon in" etc.).
         if len(line) > 500:
-            line = line[:497] + "..."
+            return None
+        if _PLACEHOLDER_RE.search(line):
+            return None
+        if not _SENTENCE_END_RE.search(line):
+            return None
 
         answer_lines.append(line)
 
@@ -977,6 +1002,14 @@ Rules:
 10. Source numbers are 1-based.
 11. Use clear, standard English. Preserve the document wording exactly only
     when a direct quotation is necessary.
+12. Answer structure: start with one plain sentence that directly answers
+    the question (e.g. "The Lessee pays all taxes."), then provide the
+    supporting quote with its page number. Never end on a cut-off sentence;
+    always quote a complete sentence.
+13. Blank or placeholder detection: if the relevant clause contains a blank
+    or placeholder such as "____", "[ ]", "(Name of the Owner)", or similar
+    unfilled field, do NOT present the placeholder as the answer. Instead,
+    write exactly: "This is left blank in the document." then cite the page.
 
 Return ONLY JSON:
 
