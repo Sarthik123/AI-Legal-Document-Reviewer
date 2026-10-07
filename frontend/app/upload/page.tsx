@@ -94,6 +94,9 @@ export default function UploadPage() {
     setSuccessMessage("");
     trackUploadStarted();
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
     try {
       const response = await fetch(
         `${API_URL}/documents`,
@@ -103,6 +106,7 @@ export default function UploadPage() {
             Authorization: `Bearer ${token}`,
           },
           body: formData,
+          signal: controller.signal,
         }
       );
 
@@ -130,6 +134,7 @@ export default function UploadPage() {
       trackUploadFailed(error);
       setMessage(apiErrorMessage(error, "Something went wrong during upload."));
     } finally {
+      clearTimeout(timeoutId);
       setUploading(false);
     }
   }

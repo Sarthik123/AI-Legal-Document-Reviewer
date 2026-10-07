@@ -36,8 +36,12 @@ export function apiErrorMessage(
     return fallback;
   }
 
+  if (error.name === "AbortError") {
+    return "Upload timed out. Try on Wi-Fi or a faster connection, then retry.";
+  }
+
   if (/load failed|failed to fetch|networkerror/i.test(error.message)) {
-    return "Unable to reach the server. Please try again.";
+    return "Could not reach the server. Check your connection or try on Wi-Fi.";
   }
 
   return error.message;

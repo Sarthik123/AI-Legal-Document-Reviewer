@@ -64,9 +64,16 @@ type UploadErrorType = "network_error" | "timeout" | "server_error";
 
 function classifyUploadError(error: unknown): UploadErrorType {
   if (!(error instanceof Error)) return "server_error";
+  if (error.name === "AbortError") return "timeout";
   const msg = error.message.toLowerCase();
-  if (msg.includes("unable to reach") || msg.includes("network")) return "network_error";
-  if (msg.includes("took too long") || msg.includes("timeout")) return "timeout";
+  if (
+    msg.includes("unable to reach") ||
+    msg.includes("could not reach") ||
+    msg.includes("network") ||
+    msg.includes("load failed") ||
+    msg.includes("failed to fetch")
+  ) return "network_error";
+  if (msg.includes("timed out") || msg.includes("timeout")) return "timeout";
   return "server_error";
 }
 
