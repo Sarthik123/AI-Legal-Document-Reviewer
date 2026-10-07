@@ -1106,6 +1106,11 @@ or:
             [],
         )
 
+    # Post-check: if the LLM still returned a placeholder despite Rule 13,
+    # replace the answer text rather than showing the blank to the user.
+    if _PLACEHOLDER_RE.search(answer):
+        answer = "This is left blank in the document."
+
     return (
         answer,
         True,

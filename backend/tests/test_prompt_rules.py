@@ -215,5 +215,65 @@ class ExtractivePathRulesTests(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class LLMPlaceholderPostCheckTests(unittest.TestCase):
+    """Post-check must replace placeholder answers the LLM returns despite Rule 13."""
+
+    def _run(self, llm_answer: str) -> tuple:
+        """Run generate_grounded_answer with the given LLM answer, return (answer, supported, evidence)."""
+        from app.services.qa_service import generate_grounded_answer
+
+        chunk = SimpleNamespace(
+            id="chunk-0",
+            chunk_index=0,
+            page_number=3,
+            content="The enhanced rental is Rs. ____.",
+            embedding=None,
+        )
+        fake_citation = "Page 3 · Line 1: The enhanced rental is Rs. ____."
+
+        with (
+            patch("app.services.qa_service._extractive_grounded_answer", return_value=None),
+            patch("app.services.qa_service._explicit_grade_answer", return_value=None),
+            patch("app.services.qa_service._explicit_experience_answer", return_value=None),
+            patch("app.services.qa_service._explicit_party_answer", return_value=None),
+            patch("app.services.qa_service._call_ollama", return_value={
+                "answerable": True,
+                "answer": llm_answer,
+                "sources": [1],
+            }),
+            patch("app.services.qa_service._evidence_for_chunk", return_value=fake_citation),
+        ):
+            return generate_grounded_answer("What is the enhanced rental?", "lease.pdf", [chunk])
+
+    def test_underscore_blank_in_answer_is_replaced(self):
+        """'The enhanced rental is Rs. ____' must become the blank message."""
+        answer, supported, evidence = self._run("The enhanced rental is Rs. ____.")
+        self.assertTrue(supported)
+        self.assertEqual(answer, "This is left blank in the document.")
+        self.assertTrue(len(evidence) > 0)
+
+    def test_parenthetical_name_placeholder_in_answer_is_replaced(self):
+        """'(Name of the Owner)' in the answer must be replaced."""
+        answer, supported, evidence = self._run(
+            "The owner of the property is (Name of the Owner)."
+        )
+        self.assertTrue(supported)
+        self.assertEqual(answer, "This is left blank in the document.")
+
+    def test_city_placeholder_in_answer_is_replaced(self):
+        """'the (city) civil courts' in the answer must be replaced."""
+        answer, supported, evidence = self._run(
+            "Disputes are subject to the jurisdiction of the (city) civil courts."
+        )
+        self.assertTrue(supported)
+        self.assertEqual(answer, "This is left blank in the document.")
+
+    def test_clean_answer_is_not_replaced(self):
+        """A normal answer without placeholders must pass through unchanged."""
+        answer, supported, evidence = self._run("The enhanced rental is Rs. 15,000 per month.")
+        self.assertTrue(supported)
+        self.assertIn("15,000", answer)
+
+
 if __name__ == "__main__":
     unittest.main()
