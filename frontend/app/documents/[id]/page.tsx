@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { clearAccessToken } from "../../auth";
 import {
@@ -10,7 +10,6 @@ import {
 } from "../../api";
 import {
   classifyRequestError,
-  deviceType,
   safeReason,
   trackAnalysisCompleted,
   trackAnalysisFailed,
@@ -60,15 +59,24 @@ type DocumentAnalysis = {
   }[];
 };
 
-// Phones and tablets can't show a PDF inside an iframe: Android Chrome draws a
-// grey box labelled with the blob URL's ID. The user agent alone isn't enough,
-// because with Chrome's "Desktop site" setting on, an Android phone sends a
-// desktop Linux user agent. Its touch screen still reports a coarse pointer.
-function canShowPdfInline(): boolean {
-  const touchPrimary =
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(pointer: coarse)").matches;
-  return !touchPrimary && deviceType() === "desktop";
+// Phones can't show a PDF inside an iframe: Android Chrome draws a grey box
+// labelled with the blob URL's ID. Device detection has proven unreliable, so
+// the file name and "Open PDF" button are always shown, and the inline preview
+// is added only on wide screens with a mouse or trackpad.
+const INLINE_PDF_QUERY = "(min-width: 1024px) and (pointer: fine)";
+
+function subscribeToInlinePdfQuery(onChange: () => void) {
+  const query = window.matchMedia(INLINE_PDF_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function useInlinePdfPreview(): boolean {
+  return useSyncExternalStore(
+    subscribeToInlinePdfQuery,
+    () => window.matchMedia(INLINE_PDF_QUERY).matches,
+    () => false,
+  );
 }
 
 // A plain link so leaving the page never depends on client-side routing,
@@ -113,7 +121,7 @@ export default function DocumentPage() {
   const processingWhenOpened = useRef(false);
   const hasTrackedResultsViewed = useRef(false);
 
-  const [inlinePdfPreview, setInlinePdfPreview] = useState(true);
+  const inlinePdfPreview = useInlinePdfPreview();
 
   // Also used by Retry: for a failed document the backend re-runs processing
   // before analysis.
@@ -255,7 +263,6 @@ export default function DocumentPage() {
         objectUrl =
           URL.createObjectURL(pdfBlob);
 
-        setInlinePdfPreview(canShowPdfInline());
         setPdfUrl(objectUrl);
       } catch (error) {
         setMessage(apiErrorMessage(error, "Failed to load document."));
@@ -515,36 +522,40 @@ export default function DocumentPage() {
             </h2>
           </div>
 
-          {pdfUrl && inlinePdfPreview ? (
-            <iframe
-              src={pdfUrl}
-              title={document.filename}
-              className="h-[800px] w-full"
-            />
-          ) : pdfUrl ? (
-            <div className="pdf-link-preview flex items-center justify-between gap-4 p-5">
-              <div className="min-w-0">
-                <p className="truncate font-medium">
-                  {document.filename}
-                </p>
+          {pdfUrl ? (
+            <>
+              <div className="pdf-link-preview flex items-center justify-between gap-4 p-5">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">
+                    {document.filename}
+                  </p>
 
-                <p className="mt-1 text-sm text-gray-500">
-                  PDF document
-                </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    PDF document
+                  </p>
+                </div>
+
+                <a
+                  href={pdfUrl}
+                  download={
+                    /\.pdf$/i.test(document.filename)
+                      ? document.filename
+                      : `${document.filename}.pdf`
+                  }
+                  className="flex-shrink-0 rounded-lg bg-black px-4 py-2 text-sm text-white"
+                >
+                  Open PDF
+                </a>
               </div>
 
-              <a
-                href={pdfUrl}
-                download={
-                  /\.pdf$/i.test(document.filename)
-                    ? document.filename
-                    : `${document.filename}.pdf`
-                }
-                className="flex-shrink-0 rounded-lg bg-black px-4 py-2 text-sm text-white"
-              >
-                Open PDF
-              </a>
-            </div>
+              {inlinePdfPreview && (
+                <iframe
+                  src={pdfUrl}
+                  title={document.filename}
+                  className="h-[800px] w-full border-t border-gray-200"
+                />
+              )}
+            </>
           ) : (
             <div className="p-6">
               <p>

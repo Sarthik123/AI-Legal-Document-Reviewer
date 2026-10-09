@@ -77,9 +77,27 @@ test.afterEach(async ({ request }, testInfo) => {
   }
 });
 
+// Opens a freshly uploaded document (analysis stubbed) and returns its ID.
+async function openDocument(
+  page: Page,
+  request: APIRequestContext,
+  testInfo: { annotations: { type: string; description?: string }[] },
+) {
+  const account = await createAccount(request);
+  testInfo.annotations.push({ type: 'e2e-test-token', description: account.token });
+  const documentId = await uploadViaApi(request, account.token);
+
+  await signIn(page, account.token);
+  await page.route('**/documents/*/analyze', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_ANALYSIS) }),
+  );
+  await page.goto('/documents/' + documentId);
+  return documentId;
+}
+
 // User agents sent by real Chrome on an Android phone. Chrome reduces the
 // device details to "Android 10; K". With "Desktop site" turned on, it sends a
-// desktop Linux user agent instead, so only touch input reveals the phone.
+// desktop Linux user agent instead. The page must not depend on either.
 const ANDROID_PHONES = [
   {
     name: 'real Android Chrome',
@@ -103,16 +121,7 @@ for (const phone of ANDROID_PHONES) test.describe(phone.name, () => {
   });
 
   test('PDF preview shows the file name and an Open PDF button, not an internal ID', async ({ page, request }, testInfo) => {
-    const account = await createAccount(request);
-    testInfo.annotations.push({ type: 'e2e-test-token', description: account.token });
-    const documentId = await uploadViaApi(request, account.token);
-
-    await signIn(page, account.token);
-    await page.route('**/documents/*/analyze', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_ANALYSIS) }),
-    );
-    await page.goto('/documents/' + documentId);
-
+    const documentId = await openDocument(page, request, testInfo);
     const preview = page.locator('.pdf-link-preview');
     await expect(preview).toBeVisible();
     await expect(preview).toContainText(AGREEMENT_FILE);
@@ -134,6 +143,36 @@ for (const phone of ANDROID_PHONES) test.describe(phone.name, () => {
       viewportWidth: window.innerWidth,
     }));
     expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  });
+});
+
+test.describe('wide screen with a mouse', () => {
+  test.use({ viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false });
+
+  test('shows the file name and Open PDF above the inline preview', async ({ page, request }, testInfo) => {
+    await openDocument(page, request, testInfo);
+
+    const preview = page.locator('.pdf-link-preview');
+    await expect(preview).toContainText(AGREEMENT_FILE);
+    await expect(preview.getByRole('link', { name: 'Open PDF' })).toBeVisible();
+    const iframe = page.locator('iframe[title="' + AGREEMENT_FILE + '"]');
+    await expect(iframe).toBeVisible();
+
+    const cardBox = await preview.boundingBox();
+    const iframeBox = await iframe.boundingBox();
+    expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(iframeBox!.y + 1);
+  });
+});
+
+test.describe('narrow screen with a mouse', () => {
+  test.use({ viewport: { width: 900, height: 800 }, hasTouch: false, isMobile: false });
+
+  test('shows Open PDF without an inline preview', async ({ page, request }, testInfo) => {
+    await openDocument(page, request, testInfo);
+
+    const preview = page.locator('.pdf-link-preview');
+    await expect(preview.getByRole('link', { name: 'Open PDF' })).toBeVisible();
+    await expect(page.locator('iframe')).toHaveCount(0);
   });
 });
 
