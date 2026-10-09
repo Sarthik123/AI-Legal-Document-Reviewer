@@ -60,52 +60,48 @@ export function trackUploadStarted(): void {
   posthog.capture("upload_started");
 }
 
-type UploadErrorType = "network_error" | "timeout" | "server_error";
+// Failure events carry only a short reason code and the device type: never
+// error messages, file names, document text, questions, answers, or emails.
+export type FailureReason = string;
 
-function classifyUploadError(error: unknown): UploadErrorType {
+export function classifyRequestError(error: unknown): FailureReason {
   if (!(error instanceof Error)) return "server_error";
   if (error.name === "AbortError") return "timeout";
-  const msg = error.message.toLowerCase();
   if (
-    msg.includes("unable to reach") ||
-    msg.includes("could not reach") ||
-    msg.includes("network") ||
-    msg.includes("load failed") ||
-    msg.includes("failed to fetch")
+    error instanceof TypeError ||
+    /load failed|failed to fetch|networkerror/i.test(error.message)
   ) return "network_error";
-  if (msg.includes("timed out") || msg.includes("timeout")) return "timeout";
   return "server_error";
 }
 
-function fileSizeBucket(size: number | undefined): string {
-  if (size === undefined) return "unknown";
-  const mb = size / (1024 * 1024);
-  if (mb < 1) return "<1MB";
-  if (mb < 5) return "1-5MB";
-  if (mb <= 10) return "5-10MB";
-  return ">10MB";
+// Only pass through server reason codes that look like codes (e.g. "ocr_failed").
+export function safeReason(value: unknown, fallback: FailureReason): FailureReason {
+  return typeof value === "string" && /^[a-z_]{1,40}$/.test(value)
+    ? value
+    : fallback;
 }
 
-// Never let a file name or path reach analytics, even if a browser puts one
-// in an error message.
-function safeErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message
-    .replace(/[^\s"'/\\]+\.(pdf|docx?|png|jpe?g)\b/gi, "[file]")
-    .replace(/(?:[a-z]+:\/\/|\/)[^\s"']+/gi, "[path]")
-    .slice(0, 160);
+export function deviceType(): "mobile" | "tablet" | "desktop" {
+  if (typeof navigator === "undefined") return "desktop";
+  const ua = navigator.userAgent;
+  if (/iPad|Tablet/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) {
+    return "tablet";
+  }
+  if (/Mobi|Android|iPhone|iPod/i.test(ua)) return "mobile";
+  return "desktop";
 }
 
-export function trackUploadFailed(
-  error: unknown,
-  file?: { size: number; type: string },
-): void {
+export function trackUploadFailed(reason: FailureReason): void {
   posthog.capture("upload_failed", {
-    error_type: classifyUploadError(error),
-    error_name: error instanceof Error ? error.name : typeof error,
-    error_message: safeErrorMessage(error),
-    file_size_bucket: fileSizeBucket(file?.size),
-    mime_type: file?.type || "unknown",
+    reason,
+    device_type: deviceType(),
+  });
+}
+
+export function trackAnalysisFailed(reason: FailureReason): void {
+  posthog.capture("analysis_failed", {
+    reason,
+    device_type: deviceType(),
   });
 }
 

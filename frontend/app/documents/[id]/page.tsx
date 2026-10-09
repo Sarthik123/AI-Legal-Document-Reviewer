@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { clearAccessToken } from "../../auth";
 import {
@@ -9,16 +9,24 @@ import {
   readApiPayload,
 } from "../../api";
 import {
+  classifyRequestError,
+  deviceType,
+  safeReason,
   trackAnalysisCompleted,
+  trackAnalysisFailed,
   trackQuestionAsked,
   trackResultsViewed,
 } from "../../lib/analytics";
+
+const PROCESSING_FAILED_MESSAGE =
+  "Something went wrong while processing your document.";
 
 type DocumentData = {
   document_id: string;
   filename: string;
   content_type: string;
   processing_status: string;
+  processing_error?: string | null;
   text_length: number | null;
   created_at: string;
 };
@@ -94,59 +102,72 @@ export default function DocumentPage() {
   const processingWhenOpened = useRef(false);
   const hasTrackedResultsViewed = useRef(false);
 
-  useEffect(() => {
-    async function runAnalysis() {
-      const token = localStorage.getItem("access_token");
+  // Phones (Android Chrome in particular) can't render a PDF inside an iframe:
+  // they show a grey box labelled with the blob URL's ID. Use a link instead.
+  const [inlinePdfPreview, setInlinePdfPreview] = useState(true);
 
-      if (!token) {
+  // Also used by Retry: for a failed document the backend re-runs processing
+  // before analysis.
+  const runAnalysis = useCallback(async () => {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      return;
+    }
+
+    setAnalysisLoading(true);
+    setAnalysisError("");
+    analysisStartedAt.current = Date.now();
+
+    try {
+      const response = await fetch(
+        `${API_URL}/documents/${documentId}/analyze`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await readApiPayload(response);
+
+      if (!response.ok) {
+        const fallbackReason =
+          response.status === 409 ? "still_processing" : "analysis_failed";
+        trackAnalysisFailed(safeReason(data.reason, fallbackReason));
+        setAnalysisError(
+          (response.status === 409 || data.reason === "no_text") &&
+            typeof data.detail === "string"
+            ? data.detail
+            : PROCESSING_FAILED_MESSAGE
+        );
         return;
       }
 
-      setAnalysisLoading(true);
-      setAnalysisError("");
-      analysisStartedAt.current = Date.now();
-
-      try {
-        const response = await fetch(
-          `${API_URL}/documents/${documentId}/analyze`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const data = await readApiPayload(response);
-
-        if (!response.ok) {
-          throw new Error(
-            typeof data.detail === "string"
-              ? data.detail
-              : "Failed to analyze document."
-          );
-        }
-
-        const durationMs =
-          analysisStartedAt.current !== null
-            ? Date.now() - analysisStartedAt.current
-            : 0;
-        if (processingWhenOpened.current) {
-          trackAnalysisCompleted(durationMs);
-        }
-        if (!hasTrackedResultsViewed.current) {
-          hasTrackedResultsViewed.current = true;
-          trackResultsViewed();
-        }
-        setAnalysis(data as unknown as DocumentAnalysis);
-      } catch (error) {
-        setAnalysisError(apiErrorMessage(error, "Failed to analyze document."));
-      } finally {
-        setAnalysisLoading(false);
+      const durationMs =
+        analysisStartedAt.current !== null
+          ? Date.now() - analysisStartedAt.current
+          : 0;
+      if (processingWhenOpened.current) {
+        trackAnalysisCompleted(durationMs);
       }
+      if (!hasTrackedResultsViewed.current) {
+        hasTrackedResultsViewed.current = true;
+        trackResultsViewed();
+      }
+      setAnalysis(data as unknown as DocumentAnalysis);
+      setDocument((current) =>
+        current && current.processing_status !== "processed"
+          ? { ...current, processing_status: "processed", processing_error: null }
+          : current
+      );
+    } catch (error) {
+      trackAnalysisFailed(classifyRequestError(error));
+      setAnalysisError(apiErrorMessage(error, PROCESSING_FAILED_MESSAGE));
+    } finally {
+      setAnalysisLoading(false);
     }
-
-    runAnalysis();
   }, [documentId]);
 
   useEffect(() => {
@@ -193,6 +214,13 @@ export default function DocumentPage() {
         }
         setDocument(docData);
 
+        // A failed document waits for the user to press Retry.
+        if (docData.processing_status === "failed") {
+          setAnalysisError(PROCESSING_FAILED_MESSAGE);
+        } else {
+          runAnalysis();
+        }
+
         const pdfResponse = await fetch(
         `${API_URL}/documents/${documentId}/file`,
           {
@@ -218,6 +246,7 @@ export default function DocumentPage() {
         objectUrl =
           URL.createObjectURL(pdfBlob);
 
+        setInlinePdfPreview(deviceType() === "desktop");
         setPdfUrl(objectUrl);
       } catch (error) {
         setMessage(apiErrorMessage(error, "Failed to load document."));
@@ -233,7 +262,7 @@ export default function DocumentPage() {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [documentId, router]);
+  }, [documentId, router, runAnalysis]);
 
   useEffect(() => {
     async function loadChatHistory() {
@@ -477,12 +506,36 @@ export default function DocumentPage() {
             </h2>
           </div>
 
-          {pdfUrl ? (
+          {pdfUrl && inlinePdfPreview ? (
             <iframe
               src={pdfUrl}
               title={document.filename}
               className="h-[800px] w-full"
             />
+          ) : pdfUrl ? (
+            <div className="pdf-link-preview flex items-center justify-between gap-4 p-5">
+              <div className="min-w-0">
+                <p className="truncate font-medium">
+                  {document.filename}
+                </p>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  PDF document
+                </p>
+              </div>
+
+              <a
+                href={pdfUrl}
+                download={
+                  /\.pdf$/i.test(document.filename)
+                    ? document.filename
+                    : `${document.filename}.pdf`
+                }
+                className="flex-shrink-0 rounded-lg bg-black px-4 py-2 text-sm text-white"
+              >
+                Open PDF
+              </a>
+            </div>
           ) : (
             <div className="p-6">
               <p>
@@ -558,6 +611,14 @@ export default function DocumentPage() {
               <p className="text-sm text-red-700">
                 {analysisError}
               </p>
+
+              <button
+                type="button"
+                onClick={runAnalysis}
+                className="mt-3 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm text-red-700 hover:bg-red-100"
+              >
+                Retry
+              </button>
             </div>
           )}
 
