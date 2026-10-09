@@ -21,6 +21,19 @@ class Document(Base):
         nullable=False,
     )
 
+    # Short reason code when processing_status is "failed", e.g. "ocr_failed".
+    processing_error: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    # When the current processing attempt started; used to detect attempts
+    # that were interrupted (worker restart, out-of-memory kill).
+    processing_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
     text_length: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
