@@ -60,6 +60,17 @@ type DocumentAnalysis = {
   }[];
 };
 
+// Phones and tablets can't show a PDF inside an iframe: Android Chrome draws a
+// grey box labelled with the blob URL's ID. The user agent alone isn't enough,
+// because with Chrome's "Desktop site" setting on, an Android phone sends a
+// desktop Linux user agent. Its touch screen still reports a coarse pointer.
+function canShowPdfInline(): boolean {
+  const touchPrimary =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  return !touchPrimary && deviceType() === "desktop";
+}
+
 // A plain link so leaving the page never depends on client-side routing,
 // even while slow document, PDF, or analysis requests are still pending.
 function BackToDashboard() {
@@ -102,8 +113,6 @@ export default function DocumentPage() {
   const processingWhenOpened = useRef(false);
   const hasTrackedResultsViewed = useRef(false);
 
-  // Phones (Android Chrome in particular) can't render a PDF inside an iframe:
-  // they show a grey box labelled with the blob URL's ID. Use a link instead.
   const [inlinePdfPreview, setInlinePdfPreview] = useState(true);
 
   // Also used by Retry: for a failed document the backend re-runs processing
@@ -246,7 +255,7 @@ export default function DocumentPage() {
         objectUrl =
           URL.createObjectURL(pdfBlob);
 
-        setInlinePdfPreview(deviceType() === "desktop");
+        setInlinePdfPreview(canShowPdfInline());
         setPdfUrl(objectUrl);
       } catch (error) {
         setMessage(apiErrorMessage(error, "Failed to load document."));
