@@ -77,6 +77,30 @@ test.afterEach(async ({ request }, testInfo) => {
   }
 });
 
+// The PDF's pages must be drawn on the page itself (not a grey placeholder):
+// page 1 is a canvas with dark text pixels on it.
+async function expectDrawnPages(page: Page) {
+  const firstPage = page.locator('canvas.pdf-page').first();
+  await expect(firstPage).toBeVisible();
+  await expect(firstPage).toHaveAttribute('aria-label', AGREEMENT_FILE + ', page 1 of 1');
+  await expect.poll(() => firstPage.evaluate((canvas: HTMLCanvasElement) => {
+    const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+    let dark = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < 100 && data[i + 1] < 100 && data[i + 2] < 100) dark += 1;
+    }
+    return dark;
+  })).toBeGreaterThan(500);
+}
+
+// The PDF section shows only the document: no Open PDF button, no download
+// link, and never the internal document ID.
+async function expectNoDownloadButton(page: Page, documentId: string) {
+  await expect(page.getByRole('link', { name: 'Open PDF' })).toHaveCount(0);
+  await expect(page.locator('a[download]')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText(documentId);
+}
+
 // Opens a freshly uploaded document (analysis stubbed) and returns its ID.
 async function openDocument(
   page: Page,
@@ -125,23 +149,12 @@ for (const phone of ANDROID_PHONES) test.describe(phone.name, () => {
     hasTouch: true,
   });
 
-  test('PDF preview shows the file name and an Open PDF button, not an internal ID', async ({ page, request }, testInfo) => {
+  test('shows the actual PDF pages, with no grey box, ID, or download button', async ({ page, request }, testInfo) => {
     const documentId = await openDocument(page, request, testInfo);
-    const preview = page.locator('.pdf-link-preview');
-    await expect(preview).toBeVisible();
-    await expect(preview).toContainText(AGREEMENT_FILE);
-    await expect(preview).not.toContainText(documentId);
+
     await expect(page.locator('iframe')).toHaveCount(0);
-
-    const openPdf = preview.getByRole('link', { name: 'Open PDF' });
-    await expect(openPdf).toHaveAttribute('download', AGREEMENT_FILE);
-
-    const downloadPromise = page.waitForEvent('download');
-    await openPdf.click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toBe(AGREEMENT_FILE);
-    const savedPath = await download.path();
-    expect(fs.readFileSync(savedPath).subarray(0, 5).toString()).toBe('%PDF-');
+    await expectDrawnPages(page);
+    await expectNoDownloadButton(page, documentId);
 
     const layout = await page.evaluate(() => ({
       documentWidth: document.documentElement.scrollWidth,
@@ -154,30 +167,24 @@ for (const phone of ANDROID_PHONES) test.describe(phone.name, () => {
 test.describe('wide screen with a mouse', () => {
   test.use({ viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false });
 
-  test('shows the file name and Open PDF above the inline preview', async ({ page, request }, testInfo) => {
-    await openDocument(page, request, testInfo);
+  test("shows the PDF in the browser's viewer, with no download button", async ({ page, request }, testInfo) => {
+    const documentId = await openDocument(page, request, testInfo);
 
-    const preview = page.locator('.pdf-link-preview');
-    await expect(preview).toContainText(AGREEMENT_FILE);
-    await expect(preview.getByRole('link', { name: 'Open PDF' })).toBeVisible();
-    const iframe = page.locator('iframe[title="' + AGREEMENT_FILE + '"]');
-    await expect(iframe).toBeVisible();
-
-    const cardBox = await preview.boundingBox();
-    const iframeBox = await iframe.boundingBox();
-    expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(iframeBox!.y + 1);
+    await expect(page.locator('iframe[title="' + AGREEMENT_FILE + '"]')).toBeVisible();
+    await expect(page.locator('canvas.pdf-page')).toHaveCount(0);
+    await expectNoDownloadButton(page, documentId);
   });
 });
 
 test.describe('narrow screen with a mouse', () => {
   test.use({ viewport: { width: 900, height: 800 }, hasTouch: false, isMobile: false });
 
-  test('shows Open PDF without an inline preview', async ({ page, request }, testInfo) => {
-    await openDocument(page, request, testInfo);
+  test('shows the drawn PDF pages instead of the built-in viewer', async ({ page, request }, testInfo) => {
+    const documentId = await openDocument(page, request, testInfo);
 
-    const preview = page.locator('.pdf-link-preview');
-    await expect(preview.getByRole('link', { name: 'Open PDF' })).toBeVisible();
     await expect(page.locator('iframe')).toHaveCount(0);
+    await expectDrawnPages(page);
+    await expectNoDownloadButton(page, documentId);
   });
 });
 
