@@ -100,6 +100,11 @@ async function openDocument(
 // desktop Linux user agent instead. The page must not depend on either.
 const ANDROID_PHONES = [
   {
+    name: "owner's Android Chrome 154",
+    userAgent:
+      'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36',
+  },
+  {
     name: 'real Android Chrome',
     userAgent:
       'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',
