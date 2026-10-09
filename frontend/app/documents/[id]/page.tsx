@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { clearAccessToken } from "../../auth";
+import PdfPages from "../../components/PdfPages";
 import {
   apiErrorMessage,
   API_URL,
@@ -61,8 +62,8 @@ type DocumentAnalysis = {
 
 // Phones can't show a PDF inside an iframe: Android Chrome draws a grey box
 // labelled with the blob URL's ID. Device detection has proven unreliable, so
-// the file name and "Open PDF" button are always shown, and the inline preview
-// is added only on wide screens with a mouse or trackpad.
+// the browser's built-in viewer is used only on wide screens with a mouse or
+// trackpad; everywhere else the pages are drawn with pdf.js.
 const INLINE_PDF_QUERY = "(min-width: 1024px) and (pointer: fine)";
 
 function subscribeToInlinePdfQuery(onChange: () => void) {
@@ -522,40 +523,20 @@ export default function DocumentPage() {
             </h2>
           </div>
 
-          {pdfUrl ? (
-            <>
-              <div className="pdf-link-preview flex items-center justify-between gap-4 p-5">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {document.filename}
-                  </p>
-
-                  <p className="mt-1 text-sm text-gray-500">
-                    PDF document
-                  </p>
-                </div>
-
-                <a
-                  href={pdfUrl}
-                  download={
-                    /\.pdf$/i.test(document.filename)
-                      ? document.filename
-                      : `${document.filename}.pdf`
-                  }
-                  className="flex-shrink-0 rounded-lg bg-black px-4 py-2 text-sm text-white"
-                >
-                  Open PDF
-                </a>
-              </div>
-
-              {inlinePdfPreview && (
-                <iframe
-                  src={pdfUrl}
-                  title={document.filename}
-                  className="h-[800px] w-full border-t border-gray-200"
-                />
-              )}
-            </>
+          {pdfUrl && inlinePdfPreview ? (
+            <iframe
+              src={pdfUrl}
+              title={document.filename}
+              className="h-[800px] w-full"
+            />
+          ) : pdfUrl ? (
+            <div className="max-h-[80vh] overflow-y-auto">
+              <PdfPages
+                key={pdfUrl}
+                url={pdfUrl}
+                title={document.filename}
+              />
+            </div>
           ) : (
             <div className="p-6">
               <p>
